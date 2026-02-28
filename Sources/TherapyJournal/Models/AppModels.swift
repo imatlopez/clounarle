@@ -11,8 +11,6 @@ struct AppConfig: Codable {
     var claudeProjectOrgID: String
     var claudeProjectID: String
     var launchAtLogin: Bool
-    var googleClientID: String
-    var googleClientSecret: String
 
     static let defaultConfig = AppConfig(
         userEmail: "",
@@ -22,9 +20,7 @@ struct AppConfig: Codable {
         claudeProjectURL: "",
         claudeProjectOrgID: "",
         claudeProjectID: "",
-        launchAtLogin: false,
-        googleClientID: "",
-        googleClientSecret: ""
+        launchAtLogin: false
     )
 
     static let configFileURL: URL = {
@@ -220,51 +216,3 @@ enum SummaryStatus: Codable {
     }
 }
 
-// MARK: - Google OAuth Token
-
-struct GoogleOAuthToken: Codable {
-    let accessToken: String
-    let refreshToken: String?
-    let expiresIn: Int
-    let tokenType: String
-    let scope: String?
-    var expirationDate: Date?
-
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case refreshToken = "refresh_token"
-        case expiresIn = "expires_in"
-        case tokenType = "token_type"
-        case scope
-        case expirationDate
-    }
-
-    var isExpired: Bool {
-        guard let expDate = expirationDate else { return true }
-        return Date() >= expDate
-    }
-}
-
-// MARK: - Google Calendar API Response
-
-struct GoogleCalendarEventsResponse: Codable {
-    let items: [GoogleCalendarEvent]?
-}
-
-struct GoogleCalendarEvent: Codable {
-    let id: String?
-    let summary: String?
-    let start: GoogleCalendarDateTime?
-    let end: GoogleCalendarDateTime?
-}
-
-struct GoogleCalendarDateTime: Codable {
-    let dateTime: String?
-    let date: String?
-}
-
-// MARK: - Gmail API Models
-
-struct GmailMessage: Codable {
-    let raw: String
-}

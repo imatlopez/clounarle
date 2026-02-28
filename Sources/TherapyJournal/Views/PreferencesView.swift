@@ -9,8 +9,6 @@ struct PreferencesView: View {
     @State private var sendTimeMinute: Int = 0
     @State private var showSaveConfirmation = false
 
-    @ObservedObject var oauthManager = GoogleOAuthManager.shared
-
     var body: some View {
         TabView {
             generalTab
@@ -18,9 +16,6 @@ struct PreferencesView: View {
 
             credentialsTab
                 .tabItem { Label("Credentials", systemImage: "key") }
-
-            googleTab
-                .tabItem { Label("Google", systemImage: "envelope") }
         }
         .frame(width: 520, height: 460)
         .onAppear(perform: loadCredentials)
@@ -35,11 +30,17 @@ struct PreferencesView: View {
                     .textFieldStyle(.roundedBorder)
                 TextField("Therapist's email", text: $config.therapistEmail)
                     .textFieldStyle(.roundedBorder)
+                Text("Emails are sent via your local Mail.app account.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section("Calendar") {
                 TextField("Session keyword (e.g. \"Therapy\", \"Dr. Smith\")", text: $config.calendarKeyword)
                     .textFieldStyle(.roundedBorder)
+                Text("Searches all calendars in your macOS Calendar app.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section("Summary Schedule") {
@@ -126,60 +127,6 @@ struct PreferencesView: View {
         .padding()
     }
 
-    // MARK: - Google Tab
-
-    private var googleTab: some View {
-        Form {
-            Section("Google OAuth Configuration") {
-                Text("Create OAuth credentials at console.cloud.google.com with Calendar and Gmail scopes.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                TextField("Client ID", text: $config.googleClientID)
-                    .textFieldStyle(.roundedBorder)
-                SecureField("Client Secret", text: $config.googleClientSecret)
-                    .textFieldStyle(.roundedBorder)
-            }
-
-            Section("Authentication Status") {
-                HStack {
-                    Circle()
-                        .fill(oauthManager.isAuthenticated ? Color.green : Color.red)
-                        .frame(width: 10, height: 10)
-                    Text(oauthManager.isAuthenticated ? "Connected to Google" : "Not connected")
-
-                    Spacer()
-
-                    if oauthManager.isAuthenticated {
-                        Button("Sign Out") {
-                            oauthManager.signOut()
-                        }
-                    } else {
-                        Button("Sign In with Google") {
-                            saveGoogleConfig()
-                            oauthManager.startOAuthFlow()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-            }
-
-            HStack {
-                Spacer()
-                if showSaveConfirmation {
-                    Text("Saved!")
-                        .foregroundColor(.green)
-                        .transition(.opacity)
-                }
-                Button("Save") {
-                    saveGoogleConfig()
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-        .padding()
-    }
-
     // MARK: - Actions
 
     private func loadCredentials() {
@@ -221,26 +168,15 @@ struct PreferencesView: View {
         }
     }
 
-    private func saveGoogleConfig() {
-        do {
-            try config.save()
-            flashSaved()
-        } catch {
-            AppLogger.shared.error("Failed to save Google config: \(error)")
-        }
-    }
-
     private func updateLaunchAtLogin() {
-        if #available(macOS 13.0, *) {
-            do {
-                if config.launchAtLogin {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-            } catch {
-                AppLogger.shared.error("Failed to update launch at login: \(error)")
+        do {
+            if config.launchAtLogin {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
             }
+        } catch {
+            AppLogger.shared.error("Failed to update launch at login: \(error)")
         }
     }
 

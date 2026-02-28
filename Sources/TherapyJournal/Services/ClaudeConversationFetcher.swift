@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 final class ClaudeConversationFetcher {
     static let shared = ClaudeConversationFetcher()
 

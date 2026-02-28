@@ -17,7 +17,7 @@
     <key>CFBundleExecutable</key>
     <string>TherapyJournal</string>
     <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
+    <string>26.0</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSAppTransportSecurity</key>
@@ -25,5 +25,9 @@
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Therapy Journal needs calendar access to detect upcoming therapy sessions.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Therapy Journal needs calendar access to detect upcoming therapy sessions.</string>
 </dict>
 </plist>

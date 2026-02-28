@@ -1,6 +1,7 @@
 import Foundation
 
 /// Schedules nightly checks for upcoming therapy sessions and triggers the summary pipeline.
+@MainActor
 final class NightlyScheduler {
     static let shared = NightlyScheduler()
 
@@ -16,14 +17,13 @@ final class NightlyScheduler {
 
         AppLogger.shared.info("Nightly scheduler started")
 
-        // Run on main run loop so timer fires reliably
-        DispatchQueue.main.async {
-            self.timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
                 self?.checkIfTimeToRun()
             }
-            // Also check immediately on start
-            self.checkIfTimeToRun()
         }
+        // Also check immediately on start
+        checkIfTimeToRun()
     }
 
     func stop() {

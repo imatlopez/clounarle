@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 final class SummaryGenerator {
     static let shared = SummaryGenerator()
 

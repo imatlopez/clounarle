@@ -1,12 +1,21 @@
 import Foundation
 import UserNotifications
 
+@MainActor
 final class NotificationManager {
     static let shared = NotificationManager()
+
+    private var isAvailable: Bool {
+        Bundle.main.bundleIdentifier != nil
+    }
 
     private init() {}
 
     func requestPermission() {
+        guard isAvailable else {
+            AppLogger.shared.warn("Notifications unavailable — no bundle identifier. Run as .app bundle.")
+            return
+        }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
                 AppLogger.shared.error("Notification permission error: \(error.localizedDescription)")
@@ -17,6 +26,10 @@ final class NotificationManager {
     }
 
     func sendNotification(title: String, body: String, identifier: String = UUID().uuidString, categoryIdentifier: String? = nil) {
+        guard isAvailable else {
+            AppLogger.shared.warn("Notification skipped (no bundle): \(title) — \(body)")
+            return
+        }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

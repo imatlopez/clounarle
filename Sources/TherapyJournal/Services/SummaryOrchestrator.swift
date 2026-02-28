@@ -1,6 +1,7 @@
 import Foundation
 
 /// Orchestrates the full summary flow: fetch conversations, generate summary, send email.
+@MainActor
 final class SummaryOrchestrator: ObservableObject {
     static let shared = SummaryOrchestrator()
 
@@ -13,7 +14,7 @@ final class SummaryOrchestrator: ObservableObject {
 
     /// Run the full summary pipeline for a therapy session.
     func runSummaryPipeline(for event: TherapyEvent) async {
-        await MainActor.run { self.isGenerating = true }
+        isGenerating = true
 
         do {
             AppLogger.shared.info("Starting summary pipeline for session: \(event.title)")
@@ -28,8 +29,7 @@ final class SummaryOrchestrator: ObservableObject {
 
             guard !conversations.isEmpty else {
                 AppLogger.shared.warn("No journal entries found for the past week")
-                let status = SummaryStatus.failed(date: Date(), error: "No journal entries found")
-                await updateStatus(status)
+                updateStatus(.failed(date: Date(), error: "No journal entries found"))
                 return
             }
 
@@ -42,29 +42,27 @@ final class SummaryOrchestrator: ObservableObject {
                 periodEnd: periodEnd
             )
 
-            // Step 3: Send email via Gmail
+            // Step 3: Send email via Mail.app
             AppLogger.shared.info("Sending summary email...")
-            try await GmailService.shared.sendSummaryEmail(summary: summary)
+            try await EmailService.shared.sendSummaryEmail(summary: summary)
 
             // Success
-            let status = SummaryStatus.sent(date: Date())
-            await updateStatus(status)
+            updateStatus(.sent(date: Date()))
             NotificationManager.shared.notifySummarySent(sessionDate: event.startDate)
             AppLogger.shared.info("Summary pipeline completed successfully")
 
         } catch {
             AppLogger.shared.error("Summary pipeline failed: \(error.localizedDescription)")
-            let status = SummaryStatus.failed(date: Date(), error: error.localizedDescription)
-            await updateStatus(status)
+            updateStatus(.failed(date: Date(), error: error.localizedDescription))
             NotificationManager.shared.notifyEmailFailed(error: error.localizedDescription)
         }
 
-        await MainActor.run { self.isGenerating = false }
+        isGenerating = false
     }
 
     /// Manual trigger: generate and send summary now (uses tomorrow's session or a placeholder date).
     func generateNow() async {
-        await MainActor.run { self.isGenerating = true }
+        isGenerating = true
 
         do {
             // Check if there's a session tomorrow
@@ -82,22 +80,19 @@ final class SummaryOrchestrator: ObservableObject {
             }
         } catch {
             AppLogger.shared.error("Manual generation failed: \(error.localizedDescription)")
-            let status = SummaryStatus.failed(date: Date(), error: error.localizedDescription)
-            await updateStatus(status)
-            await MainActor.run { self.isGenerating = false }
+            updateStatus(.failed(date: Date(), error: error.localizedDescription))
+            isGenerating = false
         }
     }
 
     // MARK: - Status Persistence
 
-    private func updateStatus(_ status: SummaryStatus) async {
-        await MainActor.run {
-            self.lastStatus = status
-        }
+    private func updateStatus(_ status: SummaryStatus) {
+        lastStatus = status
         saveLastStatus(status)
     }
 
-    private let statusFileURL: URL = {
+    private nonisolated let statusFileURL: URL = {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             .appendingPathComponent("TherapyJournal", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

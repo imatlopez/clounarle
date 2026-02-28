@@ -1,15 +1,10 @@
 import Foundation
 
-final class AppLogger {
+final class AppLogger: @unchecked Sendable {
     static let shared = AppLogger()
 
     private let logFileURL: URL
     private let queue = DispatchQueue(label: "com.therapyjournal.logger", qos: .utility)
-    private let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-        return f
-    }()
 
     private init() {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -27,11 +22,15 @@ final class AppLogger {
 
     func log(_ message: String, level: Level = .info, file: String = #file, function: String = #function, line: Int = #line) {
         let fileName = (file as NSString).lastPathComponent
-        let timestamp = dateFormatter.string(from: Date())
-        let entry = "[\(timestamp)] [\(level.rawValue)] [\(fileName):\(line)] \(message)\n"
 
+        // Format timestamp and build entry on the serial queue for thread safety
         queue.async { [weak self] in
             guard let self else { return }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+            let timestamp = formatter.string(from: Date())
+            let entry = "[\(timestamp)] [\(level.rawValue)] [\(fileName):\(line)] \(message)\n"
+
             if let data = entry.data(using: .utf8) {
                 if FileManager.default.fileExists(atPath: self.logFileURL.path) {
                     if let handle = try? FileHandle(forWritingTo: self.logFileURL) {
@@ -43,11 +42,11 @@ final class AppLogger {
                     try? data.write(to: self.logFileURL, options: .atomic)
                 }
             }
-        }
 
-        #if DEBUG
-        print(entry, terminator: "")
-        #endif
+            #if DEBUG
+            print(entry, terminator: "")
+            #endif
+        }
     }
 
     func info(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {

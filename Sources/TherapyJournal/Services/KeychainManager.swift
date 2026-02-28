@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-final class KeychainManager {
+final class KeychainManager: Sendable {
     static let shared = KeychainManager()
 
     private let service = "com.therapyjournal.app"
@@ -11,7 +11,6 @@ final class KeychainManager {
     enum KeychainKey: String {
         case claudeSessionKey = "claude_session_key"
         case claudeAPIKey = "claude_api_key"
-        case googleOAuthToken = "google_oauth_token"
     }
 
     // MARK: - String Values
