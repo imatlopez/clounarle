@@ -23,6 +23,15 @@ cp "$REPO/Resources/Info.plist" "$CONTENTS/Info.plist"
 # Resources
 cp "$REPO/Resources/JournalingSystemPrompt.txt" "$CONTENTS/Resources/JournalingSystemPrompt.txt"
 
+echo "→ Signing..."
+# Explicitly set the bundle ID as the code-signing identifier so macOS TCC
+# uses "com.therapyjournal.app" as the stable key for permission persistence.
+# Without this, ad-hoc signing derives the identifier from the binary hash,
+# which changes every rebuild and triggers a new permission prompt each time.
+codesign --force --deep --sign - \
+  --identifier "com.therapyjournal.app" \
+  "$APP" 2>&1
+
 echo "→ Relaunching..."
 pkill -x TherapyJournal 2>/dev/null || true
 sleep 0.5
