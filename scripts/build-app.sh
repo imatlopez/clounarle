@@ -1,31 +1,31 @@
-#!/bin/bash
-# Build TherapyJournal as a proper macOS .app bundle
-set -euo pipefail
+#!/usr/bin/env bash
+# Build TherapyJournal and package it as a proper .app bundle.
+# Run from the repo root: ./scripts/build-app.sh
 
-PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="$PROJECT_DIR/.build"
-APP_NAME="Therapy Journal"
-APP_BUNDLE="$BUILD_DIR/${APP_NAME}.app"
+set -e
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+APP="$REPO/.build/Therapy Journal.app"
+CONTENTS="$APP/Contents"
 
-echo "Building TherapyJournal..."
-cd "$PROJECT_DIR"
-swift build 2>&1
+echo "→ Building..."
+swift build --package-path "$REPO" 2>&1
 
-echo "Creating app bundle at $APP_BUNDLE..."
-rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_BUNDLE/Contents/MacOS"
-mkdir -p "$APP_BUNDLE/Contents/Resources"
+echo "→ Packaging .app bundle..."
+mkdir -p "$CONTENTS/MacOS"
+mkdir -p "$CONTENTS/Resources"
 
-# Copy binary
-cp "$BUILD_DIR/debug/TherapyJournal" "$APP_BUNDLE/Contents/MacOS/TherapyJournal"
+# Binary
+cp "$REPO/.build/debug/TherapyJournal" "$CONTENTS/MacOS/TherapyJournal"
 
-# Copy Info.plist
-cp "$PROJECT_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+# Info.plist (always sync from source)
+cp "$REPO/Resources/Info.plist" "$CONTENTS/Info.plist"
 
-# Copy resources
-cp "$PROJECT_DIR/Resources/JournalingSystemPrompt.txt" "$APP_BUNDLE/Contents/Resources/"
+# Resources
+cp "$REPO/Resources/JournalingSystemPrompt.txt" "$CONTENTS/Resources/JournalingSystemPrompt.txt"
 
-echo "App bundle created: $APP_BUNDLE"
-echo ""
-echo "To run:  open \"$APP_BUNDLE\""
-echo "To kill: pkill -f 'Therapy Journal' || true"
+echo "→ Relaunching..."
+pkill -x TherapyJournal 2>/dev/null || true
+sleep 0.5
+open "$APP"
+
+echo "✓ Done — Therapy Journal launched as .app"
