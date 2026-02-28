@@ -10,7 +10,6 @@ final class KeychainManager: Sendable {
 
     enum KeychainKey: String {
         case claudeSessionKey = "claude_session_key"
-        case claudeAPIKey = "claude_api_key"
     }
 
     // MARK: - String Values

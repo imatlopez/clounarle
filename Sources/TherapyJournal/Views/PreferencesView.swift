@@ -4,7 +4,6 @@ import ServiceManagement
 struct PreferencesView: View {
     @State private var config = AppConfig.load()
     @State private var claudeSessionKey: String = ""
-    @State private var claudeAPIKey: String = ""
     @State private var sendTimeHour: Int = 20
     @State private var sendTimeMinute: Int = 0
     @State private var showSaveConfirmation = false
@@ -17,7 +16,7 @@ struct PreferencesView: View {
             credentialsTab
                 .tabItem { Label("Credentials", systemImage: "key") }
         }
-        .frame(width: 500, height: 540)
+        .frame(width: 500, height: 480)
         .onAppear(perform: loadCredentials)
     }
 
@@ -102,13 +101,6 @@ struct PreferencesView: View {
                     .foregroundColor(.secondary)
             }
 
-            Section("Claude API Key") {
-                SecureField("sk-ant-...", text: $claudeAPIKey)
-                Text("Your Anthropic API key for summary generation.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
             HStack {
                 Spacer()
                 if showSaveConfirmation {
@@ -135,9 +127,6 @@ struct PreferencesView: View {
         if let key = try? KeychainManager.shared.retrieve(key: .claudeSessionKey) {
             claudeSessionKey = key
         }
-        if let key = try? KeychainManager.shared.retrieve(key: .claudeAPIKey) {
-            claudeAPIKey = key
-        }
     }
 
     private func saveGeneral() {
@@ -156,9 +145,6 @@ struct PreferencesView: View {
         do {
             if !claudeSessionKey.isEmpty {
                 try KeychainManager.shared.save(key: .claudeSessionKey, value: claudeSessionKey)
-            }
-            if !claudeAPIKey.isEmpty {
-                try KeychainManager.shared.save(key: .claudeAPIKey, value: claudeAPIKey)
             }
             flashSaved()
             AppLogger.shared.info("Credentials saved to Keychain")

@@ -7,7 +7,7 @@ A macOS menu bar app that automates therapy session prep. You journal freely in 
 1. **Journal freely** in a dedicated Claude Project on claude.ai. The project uses a custom system prompt that acts as a warm, non-judgmental journaling companion.
 2. **The night before a therapy session** (detected from your macOS Calendar), the app:
    - Pulls recent conversations from your Claude Project
-   - Sends them to the Claude API to generate a structured summary
+   - Generates a structured summary via Claude on claude.ai
    - Emails the summary to you and your therapist via Mail.app
 
 ## Summary Format
@@ -22,7 +22,7 @@ Each summary includes:
 
 - macOS 26 (Tahoe) or later
 - [Mail.app](https://support.apple.com/guide/mail/welcome/mac) configured with an email account
-- An [Anthropic API key](https://console.anthropic.com/)
+- A [Claude](https://claude.ai) account (Pro or Free — no API key needed)
 - A [Claude Project](https://claude.ai) for journaling
 
 ## Setup
@@ -58,7 +58,7 @@ The app appears as a 📖 icon in your menu bar — no Dock icon, no main window
 
 ### 3. Get Your Claude Session Key
 
-The app needs a session cookie to read your Claude Project conversations:
+The app uses a session cookie for all Claude interactions (fetching conversations and generating summaries):
 
 1. Open [claude.ai](https://claude.ai) in your browser
 2. Open DevTools (`Cmd+Option+I`) → **Application** tab → **Cookies** → `https://claude.ai`
@@ -83,7 +83,6 @@ Click the 📖 menu bar icon → **Preferences...**
 | Setting | What to enter |
 |---------|---------------|
 | Session Key | The `sessionKey` cookie from step 3 |
-| API Key | Your Anthropic API key (`sk-ant-...`) |
 
 ### 5. Grant Permissions
 
@@ -109,7 +108,7 @@ On first run, the app will ask for:
 2. The app checks your calendar every night at the configured time
 3. If there's a therapy session tomorrow, it automatically:
    - Fetches your journal conversations from the past 7 days
-   - Generates a structured summary via the Claude API
+   - Generates a structured summary via Claude on claude.ai
    - Sends the summary to you and your therapist through Mail.app
 4. You get a notification confirming success or failure
 
@@ -139,8 +138,7 @@ Click **Generate Summary Now** from the menu bar to run the pipeline immediately
 - `NSStatusItem` for menu bar integration
 - `EventKit` for local calendar access (reads all synced calendars — iCloud, Google, Exchange, etc.)
 - `NSAppleScript` → Mail.app for sending emails
-- Claude API (`claude-sonnet-4-6`) for summary generation
-- Claude.ai internal API (session cookie) for fetching journal conversations
+- Claude.ai session cookie for all Claude interactions (fetching journals + generating summaries)
 - `UserNotifications` for alerts
 - macOS Keychain for credential storage
 
@@ -154,7 +152,7 @@ Sources/TherapyJournal/
 ├── Services/
 │   ├── CalendarService.swift        # EventKit — checks tomorrow for keyword match
 │   ├── ClaudeConversationFetcher.swift  # Fetches conversations via claude.ai session cookie
-│   ├── SummaryGenerator.swift       # Claude API summary generation
+│   ├── SummaryGenerator.swift       # Summary generation via claude.ai chat
 │   ├── EmailService.swift           # Sends email via Mail.app (AppleScript)
 │   ├── SummaryOrchestrator.swift    # Full pipeline: fetch → summarize → email
 │   ├── NightlyScheduler.swift       # Fires at configured time, checks calendar

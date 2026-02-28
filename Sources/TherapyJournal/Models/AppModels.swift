@@ -102,34 +102,6 @@ struct ClaudeConversationDetail: Codable {
     }
 }
 
-// MARK: - Claude API Models
-
-struct ClaudeAPIRequest: Codable {
-    let model: String
-    let maxTokens: Int
-    let messages: [ClaudeAPIMessage]
-
-    enum CodingKeys: String, CodingKey {
-        case model
-        case maxTokens = "max_tokens"
-        case messages
-    }
-}
-
-struct ClaudeAPIMessage: Codable {
-    let role: String
-    let content: String
-}
-
-struct ClaudeAPIResponse: Codable {
-    let content: [ClaudeAPIContent]
-}
-
-struct ClaudeAPIContent: Codable {
-    let type: String
-    let text: String?
-}
-
 // MARK: - Summary
 
 struct JournalSummary {

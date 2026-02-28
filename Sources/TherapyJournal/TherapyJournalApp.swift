@@ -85,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let window = NSWindow(contentViewController: hostingController)
             window.title = "Therapy Journal Preferences"
             window.styleMask = [.titled, .closable]
-            window.setContentSize(NSSize(width: 500, height: 540))
+            window.setContentSize(NSSize(width: 500, height: 480))
             window.center()
             self.preferencesWindow = window
         }
