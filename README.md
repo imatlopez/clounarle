@@ -5,10 +5,10 @@ A macOS menu bar app that automates therapy session prep. You journal freely in 
 ## How It Works
 
 1. **Journal freely** in a dedicated Claude Project on claude.ai. The project uses a custom system prompt that acts as a warm, non-judgmental journaling companion.
-2. **The night before a therapy session** (detected via Google Calendar), the app:
+2. **The night before a therapy session** (detected from your macOS Calendar), the app:
    - Pulls recent conversations from your Claude Project
    - Sends them to the Claude API to generate a structured summary
-   - Emails the summary to you and your therapist via Gmail
+   - Emails the summary to you and your therapist via Mail.app
 
 ## Summary Format
 
@@ -18,95 +18,151 @@ Each summary includes:
 - **Key highlights** — verbatim quotes or close paraphrases worth surfacing
 - **Possible things to explore in session** — suggested discussion points
 
+## Requirements
+
+- macOS 26 (Tahoe) or later
+- [Mail.app](https://support.apple.com/guide/mail/welcome/mac) configured with an email account
+- An [Anthropic API key](https://console.anthropic.com/)
+- A [Claude Project](https://claude.ai) for journaling
+
 ## Setup
 
-### 1. Build & Install
+### 1. Build & Run
 
 ```bash
-cd TherapyJournal
-swift build -c release
-# Copy the built binary to /Applications or run directly
+git clone git@github.com:imatlopez/clounarle.git
+cd clounarle
+
+# Build the .app bundle
+./scripts/build-app.sh
+
+# Launch it
+open ".build/Therapy Journal.app"
 ```
 
-Or open in Xcode:
-```bash
-open Package.swift
-```
+The app appears as a 📖 icon in your menu bar — no Dock icon, no main window.
 
 ### 2. Create Your Claude Journal Project
 
 1. Go to [claude.ai](https://claude.ai) and create a new **Project**
-2. In the project's system prompt, paste the contents of `Resources/JournalingSystemPrompt.txt`
+2. In the project's custom instructions, paste the contents of [`Resources/JournalingSystemPrompt.txt`](Resources/JournalingSystemPrompt.txt):
+
+   > You are a warm, attentive journaling companion. Your role is to be a safe space for someone to process their thoughts and feelings — nothing more, nothing less.
+   >
+   > It welcomes you warmly, asks gentle follow-up questions, reflects back what it hears, and never gives advice or diagnoses. See the full prompt in the file.
+
 3. Note the **Organization ID** and **Project ID** from the URL:
    ```
    https://claude.ai/project/{org-id}/{project-id}
    ```
 
-### 3. Google Cloud Setup
+### 3. Get Your Claude Session Key
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project (or use an existing one)
-3. Enable the **Google Calendar API** and **Gmail API**
-4. Create **OAuth 2.0 credentials** (Desktop application)
-5. Add `http://127.0.0.1:8089/oauth/callback` as an authorized redirect URI
-6. Copy the Client ID and Client Secret
+The app needs a session cookie to read your Claude Project conversations:
+
+1. Open [claude.ai](https://claude.ai) in your browser
+2. Open DevTools (`Cmd+Option+I`) → **Application** tab → **Cookies** → `https://claude.ai`
+3. Copy the value of the `sessionKey` cookie
 
 ### 4. Configure the App
 
-Open **Preferences** from the menu bar icon and fill in:
+Click the 📖 menu bar icon → **Preferences...**
 
 **General tab:**
-- Your email address
-- Therapist's email address
-- Calendar keyword (e.g., "Therapy", "Dr. Smith")
-- Summary send time (default: 8:00 PM)
-- Claude Project URL, Organization ID, and Project ID
-- Launch at Login toggle
+| Setting | What to enter |
+|---------|---------------|
+| Your email | Where to send the summary |
+| Therapist's email | Your therapist's email address |
+| Session keyword | Text to match in Calendar events (e.g. `Therapy`, `Dr. Smith`) |
+| Send time | When to check for tomorrow's session (default: 8:00 PM) |
+| Project URL | Your Claude Project URL |
+| Organization ID | From the project URL |
+| Project ID | From the project URL |
 
 **Credentials tab:**
-- **Claude Session Key**: Open claude.ai in your browser → DevTools → Application → Cookies → copy the `sessionKey` value
-- **Claude API Key**: Your Anthropic API key (`sk-ant-...`)
+| Setting | What to enter |
+|---------|---------------|
+| Session Key | The `sessionKey` cookie from step 3 |
+| API Key | Your Anthropic API key (`sk-ant-...`) |
 
-**Google tab:**
-- Google Client ID and Client Secret
-- Click "Sign In with Google" to authorize Calendar and Gmail access
+### 5. Grant Permissions
 
-## Menu Bar Options
+On first run, the app will ask for:
+- **Calendar access** — to check for therapy sessions on your calendar
+- **Automation access** — to send emails through Mail.app
 
-- **Generate Summary Now** — manually trigger the summary pipeline
-- **Open Claude Journal Project** — opens your Claude Project in the browser
-- **Preferences** — configure emails, calendar, credentials
-- **Last summary** — shows date and sent/failed status
-- **Quit**
+## Usage
 
-## How the Nightly Check Works
+### Menu Bar Options
 
-1. At your configured time (default 8:00 PM), the app checks Google Calendar for tomorrow
-2. If an event matching your keyword exists, it triggers the pipeline
-3. Journal conversations from the past 7 days are fetched from Claude.ai
-4. The Claude API generates a structured summary
-5. The summary is emailed to you and your therapist via Gmail
-6. You get a macOS notification confirming success or failure
+| Menu item | What it does |
+|-----------|-------------|
+| **Generate Summary Now** | Manually trigger the full pipeline (fetch → summarize → email) |
+| **Open Claude Journal Project** | Opens your Claude Project in the browser |
+| **Last summary** | Shows date and sent/failed status of the most recent summary |
+| **Preferences...** | Open settings |
+| **Quit** | Exit the app |
+
+### Daily Workflow
+
+1. Journal in your Claude Project whenever you want — it's just a conversation
+2. The app checks your calendar every night at the configured time
+3. If there's a therapy session tomorrow, it automatically:
+   - Fetches your journal conversations from the past 7 days
+   - Generates a structured summary via the Claude API
+   - Sends the summary to you and your therapist through Mail.app
+4. You get a notification confirming success or failure
+
+### Manual Trigger
+
+Click **Generate Summary Now** from the menu bar to run the pipeline immediately, even without a calendar event. Useful for testing or if you want a summary on demand.
 
 ## File Locations
 
-- **Config**: `~/Documents/TherapyJournal/config.json`
-- **Logs**: `~/Documents/TherapyJournal/app.log`
-- **Credentials**: macOS Keychain (service: `com.therapyjournal.app`)
+| What | Where |
+|------|-------|
+| Config | `~/Documents/TherapyJournal/config.json` |
+| Logs | `~/Documents/TherapyJournal/app.log` |
+| Last status | `~/Documents/TherapyJournal/last_status.json` |
+| Credentials | macOS Keychain (service: `com.therapyjournal.app`) |
 
 ## Error Handling
 
-- **Session cookie expired**: Menu bar notification prompting you to refresh it in Preferences
-- **Calendar check fails**: Logged silently, retried next night
-- **Email fails**: macOS notification with option to retry
-- **All activity**: Logged to `~/Documents/TherapyJournal/app.log`
+- **Session cookie expired** → notification prompting you to refresh it in Preferences
+- **Calendar check fails** → logged silently, retried next night
+- **Email fails** → macOS notification with error details
+- **All activity** → logged to `~/Documents/TherapyJournal/app.log`
 
 ## Tech Stack
 
-- Swift + SwiftUI
-- NSStatusItem for menu bar
-- Google Calendar API + Gmail API via OAuth 2.0
-- Claude API (claude-sonnet-4-6) for summary generation
+- Swift 6.2 + SwiftUI, targeting macOS 26 (Tahoe)
+- `NSStatusItem` for menu bar integration
+- `EventKit` for local calendar access (reads all synced calendars — iCloud, Google, Exchange, etc.)
+- `NSAppleScript` → Mail.app for sending emails
+- Claude API (`claude-sonnet-4-6`) for summary generation
 - Claude.ai internal API (session cookie) for fetching journal conversations
-- UserNotifications for alerts
+- `UserNotifications` for alerts
 - macOS Keychain for credential storage
+
+## Project Structure
+
+```
+Sources/TherapyJournal/
+├── TherapyJournalApp.swift          # @main, AppDelegate, NSStatusItem
+├── Models/
+│   └── AppModels.swift              # All data types
+├── Services/
+│   ├── CalendarService.swift        # EventKit — checks tomorrow for keyword match
+│   ├── ClaudeConversationFetcher.swift  # Fetches conversations via claude.ai session cookie
+│   ├── SummaryGenerator.swift       # Claude API summary generation
+│   ├── EmailService.swift           # Sends email via Mail.app (AppleScript)
+│   ├── SummaryOrchestrator.swift    # Full pipeline: fetch → summarize → email
+│   ├── NightlyScheduler.swift       # Fires at configured time, checks calendar
+│   └── KeychainManager.swift        # Secure credential storage
+├── Utilities/
+│   ├── Logger.swift                 # File logger → ~/Documents/TherapyJournal/app.log
+│   └── NotificationManager.swift    # macOS notifications
+└── Views/
+    ├── MenuBarView.swift            # Popover menu
+    └── PreferencesView.swift        # 2 tabs: General, Credentials
+```
