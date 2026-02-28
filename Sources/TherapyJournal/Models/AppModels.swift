@@ -8,9 +8,12 @@ struct AppConfig: Codable {
     var calendarKeyword: String
     var summarySendTime: DateComponents
     var claudeProjectURL: String
-    var claudeProjectOrgID: String
-    var claudeProjectID: String
+    var summaryLanguage: String
     var launchAtLogin: Bool
+
+    // Cached values resolved at runtime — not user-editable
+    var cachedOrgID: String
+    var cachedProjectID: String
 
     static let defaultConfig = AppConfig(
         userEmail: "",
@@ -18,10 +21,20 @@ struct AppConfig: Codable {
         calendarKeyword: "Therapy",
         summarySendTime: DateComponents(hour: 20, minute: 0),
         claudeProjectURL: "",
-        claudeProjectOrgID: "",
-        claudeProjectID: "",
-        launchAtLogin: false
+        summaryLanguage: "English",
+        launchAtLogin: false,
+        cachedOrgID: "",
+        cachedProjectID: ""
     )
+
+    /// Extract the project UUID from the project URL.
+    /// Handles: claude.ai/project/{uuid} or claude.ai/project/{org}/{uuid}
+    var projectID: String {
+        guard let url = URL(string: claudeProjectURL) else { return cachedProjectID }
+        let components = url.pathComponents  // e.g. ["/", "project", "{uuid}"]
+        guard components.count >= 3, components[1] == "project" else { return cachedProjectID }
+        return components.last ?? cachedProjectID
+    }
 
     static let configFileURL: URL = {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!

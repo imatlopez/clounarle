@@ -16,7 +16,7 @@ struct TherapyJournalApp: App {
 // MARK: - App Delegate
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     static var shared: AppDelegate?
 
     private var statusItem: NSStatusItem?
@@ -78,6 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Preferences Window
 
     func openPreferences() {
+        // Close the popover first so it doesn't steal focus
+        popover?.performClose(nil)
+
         if preferencesWindow == nil {
             let prefsView = PreferencesView()
             let hostingController = NSHostingController(rootView: prefsView)
@@ -86,11 +89,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = "Therapy Journal Preferences"
             window.styleMask = [.titled, .closable]
             window.setContentSize(NSSize(width: 500, height: 480))
+            window.isReleasedWhenClosed = false
             window.center()
+            window.delegate = self
             self.preferencesWindow = window
         }
 
-        preferencesWindow?.makeKeyAndOrderFront(nil)
+        // LSUIElement apps must temporarily become regular to accept keyboard input
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        preferencesWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: - NSWindowDelegate
+
+    nonisolated func windowWillClose(_ notification: Notification) {
+        // Return to accessory (background) mode when Preferences closes
+        _ = MainActor.assumeIsolated {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 }

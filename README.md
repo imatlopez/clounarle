@@ -75,9 +75,8 @@ Click the 📖 menu bar icon → **Preferences...**
 | Therapist's email | Your therapist's email address |
 | Session keyword | Text to match in Calendar events (e.g. `Therapy`, `Dr. Smith`) |
 | Send time | When to check for tomorrow's session (default: 8:00 PM) |
-| Project URL | Your Claude Project URL |
-| Organization ID | From the project URL |
-| Project ID | From the project URL |
+| Project URL | Your Claude Project URL (e.g. `https://claude.ai/project/...`) |
+| Summary language | English or Spanish |
 
 **Credentials tab:**
 | Setting | What to enter |

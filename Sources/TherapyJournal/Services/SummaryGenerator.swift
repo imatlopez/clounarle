@@ -13,10 +13,7 @@ final class SummaryGenerator {
     func generateSummary(conversations: [ClaudeConversationDetail], sessionDate: Date, periodStart: Date, periodEnd: Date) async throws -> JournalSummary {
         let sessionKey = try getSessionKey()
         let config = AppConfig.load()
-
-        guard !config.claudeProjectOrgID.isEmpty else {
-            throw SummaryError.orgNotConfigured
-        }
+        let orgID = try await ClaudeConversationFetcher.shared.resolveOrgID(sessionKey: sessionKey)
 
         let journalText = formatConversationsForPrompt(conversations)
 
@@ -24,14 +21,19 @@ final class SummaryGenerator {
             throw SummaryError.noJournalEntries
         }
 
+        let languageInstruction = config.summaryLanguage == "English"
+            ? "Write the summary in English."
+            : "Escribe el resumen en español."
+
         let prompt = """
         \(systemPrompt)
+
+        \(languageInstruction)
 
         \(userMessage(journalText: journalText))
         """
 
         let conversationUUID = UUID().uuidString.lowercased()
-        let orgID = config.claudeProjectOrgID
 
         AppLogger.shared.info("Sending journal entries to Claude for summary generation...")
 
@@ -234,7 +236,6 @@ private struct SSECompletionEvent: Decodable {
 
 enum SummaryError: LocalizedError {
     case noJournalEntries
-    case orgNotConfigured
     case sessionKeyMissing
     case sessionExpired
     case apiError
@@ -243,7 +244,6 @@ enum SummaryError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noJournalEntries: return "No journal entries found for the period."
-        case .orgNotConfigured: return "Organization ID not configured. Set it in Preferences."
         case .sessionKeyMissing: return "Claude session key not found. Please enter it in Preferences."
         case .sessionExpired: return "Claude session cookie has expired. Please update it in Preferences."
         case .apiError: return "Claude.ai chat request failed."

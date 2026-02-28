@@ -61,12 +61,19 @@ struct PreferencesView: View {
             }
 
             Section("Claude Journal Project") {
-                TextField("Project URL", text: $config.claudeProjectURL)
-                TextField("Organization ID", text: $config.claudeProjectOrgID)
-                TextField("Project ID", text: $config.claudeProjectID)
-                Text("Find these in your Claude Project URL: claude.ai/project/{org-id}/{project-id}")
+                TextField("https://claude.ai/project/...", text: $config.claudeProjectURL)
+                Text("Paste the full URL of your Claude journaling project.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            }
+
+            Section("Summary Language") {
+                Picker("Language", selection: $config.summaryLanguage) {
+                    Text("English").tag("English")
+                    Text("Español").tag("Spanish")
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
             }
 
             Section {
