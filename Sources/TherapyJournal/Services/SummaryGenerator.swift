@@ -191,36 +191,40 @@ final class SummaryGenerator {
     // MARK: - Prompt
 
     private let systemPrompt = """
-    You are a helpful assistant that creates structured therapy session prep summaries. \
-    You will be given journal entries from a person's therapy journal (conversations with an AI journaling companion). \
-    Your job is to synthesize these entries into a concise, useful summary their therapist can review before the session.
+    You are preparing a pre-session briefing for a therapist. \
+    The source material is journal entries from their client's AI journaling companion — raw, unfiltered conversations where the client processed their week. \
+    Your job is to turn this into something the therapist can read in 2 minutes and walk in knowing exactly what's been happening and what to pay attention to.
 
-    Format your response EXACTLY as follows (use this exact structure):
+    Be specific. Name the actual situations, people, decisions, and moments the client described. \
+    Do not summarize into abstract categories like "work stress" or "relationship issues" — say what actually happened. \
+    Use the client's own words and framing whenever possible.
 
-    **This week's themes**
-    - [theme 1]
-    - [theme 2]
-    - [add more as needed]
+    Format your response EXACTLY as follows:
 
-    **Emotional tone**
-    - [Brief reading of overall mood/tone across entries, e.g. "Anxious early in the week, more settled by Thursday"]
+    **What's been happening**
+    Describe the actual events, situations, or decisions the client has been dealing with this week. \
+    Be concrete — who, what, when. 3–6 bullet points. No abstract categories.
 
-    **Key highlights**
-    - "[verbatim quote or close paraphrase worth surfacing]"
-    - "[another highlight]"
-    - [add more as needed]
+    **How they're relating to it**
+    How is the client framing what's going on? What story are they telling themselves? \
+    Are they taking responsibility, deflecting, minimizing, catastrophizing? \
+    What emotional register are they operating in — anxious, resigned, angry, unclear? \
+    Note any shifts across the week.
 
-    **Possible things to explore in session**
-    - [suggestion 1]
-    - [suggestion 2]
-    - [add more as needed]
+    **In their own words**
+    3–5 verbatim quotes or very close paraphrases that reveal something — a belief, a fear, an insight, a contradiction. \
+    Choose quotes that a therapist would want to return to.
+
+    **What feels unresolved or charged**
+    What did they keep circling back to? What did they seem to avoid or brush past? \
+    What questions are they sitting with that didn't get answered? \
+    What might be worth naming directly in session?
 
     Guidelines:
-    - Be concise but thorough
-    - Use the person's own words where possible
-    - Do not diagnose or give clinical opinions
-    - Focus on themes, patterns, and emotional content
-    - Highlight anything that seems particularly significant or recurring
+    - Specific always beats general. "She had a fight with her sister about their mother's care" beats "family tension."
+    - Do not diagnose or use clinical labels.
+    - If the entries are thin or the week was quiet, say so — don't inflate.
+    - Keep each section tight. A therapist needs signal, not noise.
     """
 
     private func userMessage(journalText: String) -> String {
