@@ -17,7 +17,7 @@ struct PreferencesView: View {
             credentialsTab
                 .tabItem { Label("Credentials", systemImage: "key") }
         }
-        .frame(width: 520, height: 460)
+        .frame(width: 500, height: 540)
         .onAppear(perform: loadCredentials)
     }
 
@@ -27,30 +27,28 @@ struct PreferencesView: View {
         Form {
             Section("Email Addresses") {
                 TextField("Your email", text: $config.userEmail)
-                    .textFieldStyle(.roundedBorder)
                 TextField("Therapist's email", text: $config.therapistEmail)
-                    .textFieldStyle(.roundedBorder)
                 Text("Emails are sent via your local Mail.app account.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Section("Calendar") {
-                TextField("Session keyword (e.g. \"Therapy\", \"Dr. Smith\")", text: $config.calendarKeyword)
-                    .textFieldStyle(.roundedBorder)
-                Text("Searches all calendars in your macOS Calendar app.")
+                TextField("Session keyword", text: $config.calendarKeyword)
+                Text("Matches event titles containing this keyword across all calendars. For example: \"Therapy\" or \"Dr. Smith\".")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
 
             Section("Summary Schedule") {
                 HStack {
-                    Text("Send summary at:")
+                    Text("Send summary at")
                     Picker("Hour", selection: $sendTimeHour) {
                         ForEach(0..<24, id: \.self) { h in
                             Text(String(format: "%02d", h)).tag(h)
                         }
                     }
+                    .labelsHidden()
                     .frame(width: 70)
                     Text(":")
                     Picker("Minute", selection: $sendTimeMinute) {
@@ -58,17 +56,18 @@ struct PreferencesView: View {
                             Text(String(format: "%02d", m)).tag(m)
                         }
                     }
+                    .labelsHidden()
                     .frame(width: 70)
                 }
             }
 
             Section("Claude Journal Project") {
-                TextField("Project URL (claude.ai)", text: $config.claudeProjectURL)
-                    .textFieldStyle(.roundedBorder)
+                TextField("Project URL", text: $config.claudeProjectURL)
                 TextField("Organization ID", text: $config.claudeProjectOrgID)
-                    .textFieldStyle(.roundedBorder)
                 TextField("Project ID", text: $config.claudeProjectID)
-                    .textFieldStyle(.roundedBorder)
+                Text("Find these in your Claude Project URL: claude.ai/project/{org-id}/{project-id}")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section {
@@ -88,6 +87,7 @@ struct PreferencesView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
+        .formStyle(.grouped)
         .padding()
     }
 
@@ -96,19 +96,17 @@ struct PreferencesView: View {
     private var credentialsTab: some View {
         Form {
             Section("Claude Session Key") {
-                Text("Paste your sessionKey from browser DevTools (Application > Cookies > claude.ai)")
+                SecureField("Paste session key", text: $claudeSessionKey)
+                Text("From browser DevTools → Application → Cookies → claude.ai → sessionKey")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                SecureField("Session Key", text: $claudeSessionKey)
-                    .textFieldStyle(.roundedBorder)
             }
 
             Section("Claude API Key") {
-                Text("Your Anthropic API key for summary generation")
+                SecureField("sk-ant-...", text: $claudeAPIKey)
+                Text("Your Anthropic API key for summary generation.")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                SecureField("API Key (sk-ant-...)", text: $claudeAPIKey)
-                    .textFieldStyle(.roundedBorder)
             }
 
             HStack {
@@ -124,6 +122,7 @@ struct PreferencesView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
+        .formStyle(.grouped)
         .padding()
     }
 
