@@ -62,21 +62,53 @@ final class SummaryGenerator {
     // MARK: - Chat via claude.ai
 
     private func sendChatMessage(orgID: String, conversationUUID: String, prompt: String, sessionKey: String) async throws -> String {
-        let url = URL(string: "\(baseURL)/organizations/\(orgID)/chat_conversations")!
-        var request = URLRequest(url: url)
+        // Step 1: Create the conversation
+        let createURL = URL(string: "\(baseURL)/organizations/\(orgID)/chat_conversations")!
+        var createRequest = URLRequest(url: createURL)
+        createRequest.httpMethod = "POST"
+        createRequest.setValue(sessionKey, forHTTPHeaderField: "Cookie")
+        createRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        createRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        createRequest.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
+        createRequest.setValue("https://claude.ai/", forHTTPHeaderField: "Referer")
+        createRequest.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+
+        let createBody: [String: Any] = [
+            "uuid": conversationUUID,
+            "name": "",
+            "model": "claude-opus-4-5",
+        ]
+        createRequest.httpBody = try JSONSerialization.data(withJSONObject: createBody)
+
+        let (_, createResponse) = try await URLSession.shared.data(for: createRequest)
+        if let http = createResponse as? HTTPURLResponse {
+            AppLogger.shared.debug("Create conversation → HTTP \(http.statusCode)")
+            if http.statusCode == 401 || http.statusCode == 403 {
+                NotificationManager.shared.notifySessionCookieExpired()
+                throw SummaryError.sessionExpired
+            }
+            guard http.statusCode == 200 || http.statusCode == 201 else {
+                throw SummaryError.apiError
+            }
+        }
+
+        // Step 2: Send the prompt to the completion endpoint and stream the response
+        let completionURL = URL(string: "\(baseURL)/organizations/\(orgID)/chat_conversations/\(conversationUUID)/completion")!
+        var request = URLRequest(url: completionURL)
         request.httpMethod = "POST"
-        request.setValue("sessionKey=\(sessionKey)", forHTTPHeaderField: "Cookie")
+        request.setValue(sessionKey, forHTTPHeaderField: "Cookie")
         request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
+        request.setValue("https://claude.ai/", forHTTPHeaderField: "Referer")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
 
         let body: [String: Any] = [
-            "uuid": conversationUUID,
-            "organization_uuid": orgID,
-            "name": "",
             "prompt": prompt,
-            "model": "claude-sonnet-4-6",
+            "model": "claude-opus-4-5",
             "timezone": TimeZone.current.identifier,
+            "attachments": [],
+            "files": [],
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -86,17 +118,20 @@ final class SummaryGenerator {
             throw SummaryError.apiError
         }
 
+        AppLogger.shared.debug("Completion stream → HTTP \(httpResponse.statusCode)")
+
         if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
             NotificationManager.shared.notifySessionCookieExpired()
             throw SummaryError.sessionExpired
         }
 
-        guard httpResponse.statusCode == 200 else {
-            AppLogger.shared.error("Claude.ai chat error: HTTP \(httpResponse.statusCode)")
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            AppLogger.shared.error("Claude.ai completion error: HTTP \(httpResponse.statusCode)")
             throw SummaryError.apiError
         }
 
         // Parse SSE stream — accumulate completion text deltas
+        // Format: `event: completion\ndata: {"type":"completion","completion":"...","stop_reason":null|"end_turn"}`
         var accumulated = ""
         for try await line in bytes.lines {
             guard line.hasPrefix("data: ") else { continue }
@@ -124,8 +159,10 @@ final class SummaryGenerator {
         let url = URL(string: "\(baseURL)/organizations/\(orgID)/chat_conversations/\(conversationUUID)")!
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-        request.setValue("sessionKey=\(sessionKey)", forHTTPHeaderField: "Cookie")
-        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        request.setValue(sessionKey, forHTTPHeaderField: "Cookie")
+        request.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
+        request.setValue("https://claude.ai/", forHTTPHeaderField: "Referer")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
 
         do {
             let (_, response) = try await URLSession.shared.data(for: request)

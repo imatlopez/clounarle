@@ -101,9 +101,9 @@ struct PreferencesView: View {
 
     private var credentialsTab: some View {
         Form {
-            Section("Claude Session Key") {
-                SecureField("Paste session key", text: $claudeSessionKey)
-                Text("From browser DevTools → Application → Cookies → claude.ai → sessionKey")
+            Section("Claude Cookies") {
+                SecureField("Paste cookie header value", text: $claudeSessionKey)
+                Text("DevTools → Network → any claude.ai request → Request Headers → Cookie — copy the entire value.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

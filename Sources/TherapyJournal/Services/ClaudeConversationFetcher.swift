@@ -21,19 +21,27 @@ final class ClaudeConversationFetcher {
 
         let url = URL(string: "\(baseURL)/organizations")!
         var request = URLRequest(url: url)
-        request.setValue("sessionKey=\(sessionKey)", forHTTPHeaderField: "Cookie")
+        request.setValue(sessionKey, forHTTPHeaderField: "Cookie")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
+        request.setValue("https://claude.ai/", forHTTPHeaderField: "Referer")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
         if let httpResponse = response as? HTTPURLResponse {
-            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+            let statusCode = httpResponse.statusCode
+            AppLogger.shared.debug("GET /api/organizations → HTTP \(statusCode)")
+            if statusCode == 401 || statusCode == 403 {
+                let body = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
+                AppLogger.shared.error("Auth rejected (\(statusCode)): \(body)")
                 NotificationManager.shared.notifySessionCookieExpired()
                 throw ClaudeFetchError.sessionExpired
             }
-            guard httpResponse.statusCode == 200 else {
-                throw ClaudeFetchError.apiFailed(statusCode: httpResponse.statusCode)
+            guard statusCode == 200 else {
+                let body = String(data: data.prefix(200), encoding: .utf8) ?? "<non-utf8>"
+                AppLogger.shared.error("Unexpected status \(statusCode): \(body)")
+                throw ClaudeFetchError.apiFailed(statusCode: statusCode)
             }
         }
 
@@ -106,9 +114,11 @@ final class ClaudeConversationFetcher {
     private func listProjectConversations(orgID: String, projectID: String, sessionKey: String) async throws -> [ClaudeConversation] {
         let url = URL(string: "\(baseURL)/organizations/\(orgID)/projects/\(projectID)/conversations")!
         var request = URLRequest(url: url)
-        request.setValue("sessionKey=\(sessionKey)", forHTTPHeaderField: "Cookie")
+        request.setValue(sessionKey, forHTTPHeaderField: "Cookie")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
+        request.setValue("https://claude.ai/", forHTTPHeaderField: "Referer")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -130,9 +140,11 @@ final class ClaudeConversationFetcher {
     private func fetchConversationDetail(orgID: String, conversationID: String, sessionKey: String) async throws -> ClaudeConversationDetail {
         let url = URL(string: "\(baseURL)/organizations/\(orgID)/chat_conversations/\(conversationID)")!
         var request = URLRequest(url: url)
-        request.setValue("sessionKey=\(sessionKey)", forHTTPHeaderField: "Cookie")
+        request.setValue(sessionKey, forHTTPHeaderField: "Cookie")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
+        request.setValue("https://claude.ai/", forHTTPHeaderField: "Referer")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
