@@ -18,29 +18,26 @@ final class EmailService {
         }
 
         let recipients = [config.userEmail, config.therapistEmail]
-        try await sendToRecipients(recipients, subject: summary.emailSubject, htmlBody: summary.emailBodyHTML)
+        try await sendToRecipients(recipients, subject: summary.emailSubject, rtfBody: summary.emailBodyRTF)
 
         AppLogger.shared.info("Summary email sent via Mail.app to \(config.userEmail) and \(config.therapistEmail)")
     }
 
     /// Send the summary to an explicit list of recipients (used for preview / "send to me only").
-    func sendToRecipients(_ recipients: [String], subject: String, htmlBody: String) async throws {
-        try await sendViaMailApp(to: recipients, subject: subject, htmlBody: htmlBody)
+    func sendToRecipients(_ recipients: [String], subject: String, rtfBody: Data) async throws {
+        try await sendViaMailApp(to: recipients, subject: subject, rtfBody: rtfBody)
         AppLogger.shared.info("Email sent via Mail.app to \(recipients.joined(separator: ", "))")
     }
 
     /// Send an email using Mail.app via AppleScript.
-    private func sendViaMailApp(to recipients: [String], subject: String, htmlBody: String) async throws {
+    private func sendViaMailApp(to recipients: [String], subject: String, rtfBody: Data) async throws {
         let escapedSubject = escapeForAppleScript(subject)
 
-        // Write HTML to a temp file so AppleScript reads it at runtime rather than
-        // embedding it as a compiled string literal. This sidesteps two bugs:
-        // (1) `html content` requires the compose editor (NSTextView) to be
-        //     initialized — it is only created when visible:true is set;
-        // (2) large/complex HTML embedded in AppleScript source is unreliable.
+        // Write RTF to a temp file. AppleScript reads it as «class RTF » styled text
+        // and sets it as the message content, bypassing Mail.app's HTML parser entirely.
         let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("therapy_summary_\(Int(Date().timeIntervalSince1970)).html")
-        try htmlBody.write(to: tempURL, atomically: true, encoding: .utf8)
+            .appendingPathComponent("therapy_summary_\(Int(Date().timeIntervalSince1970)).rtf")
+        try rtfBody.write(to: tempURL, options: .atomic)
         defer { try? FileManager.default.removeItem(at: tempURL) }
 
         let escapedPath = escapeForAppleScript(tempURL.path)
@@ -51,14 +48,12 @@ final class EmailService {
             recipientLines += "make new to recipient at end of to recipients with properties {address:\"\(escaped)\"}\n"
         }
 
-        // visible:true is required so Mail initializes the compose editor before
-        // we set html content. The window briefly appears and closes on send.
         let script = """
         tell application "Mail"
-            set htmlText to read POSIX file "\(escapedPath)" as Unicode text
+            set rtfText to read POSIX file "\(escapedPath)" as «class RTF »
             set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", visible:true}
             tell newMessage
-                set html content to htmlText
+                set content to rtfText
                 \(recipientLines)
             end tell
             send newMessage

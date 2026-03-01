@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // MARK: - App Configuration
@@ -132,53 +133,80 @@ struct JournalSummary {
         return "Therapy prep — \(formatter.string(from: sessionDate))"
     }
 
-    // Body-only HTML (no html/head/body wrapper) with inline styles.
-    // Mail.app's `html content` AppleScript property expects a body fragment,
-    // not a full document — passing <!DOCTYPE html>...</html> is silently discarded.
-    var emailBodyHTML: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM d"
-        let startStr = formatter.string(from: periodStart)
-        let endStr = formatter.string(from: periodEnd)
-        let contentHTML = markdownToHTML(content)
-        return """
-        <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 600px; padding: 20px 24px; color: #222;">
-        \(contentHTML)
-        <div style="margin-top: 36px; padding-top: 12px; border-top: 1px solid #eee; color: #888; font-size: 12px;">Auto-generated from Claude journal entries from \(startStr) to \(endStr).</div>
-        </div>
-        """
-    }
+    /// RTF email body built from NSAttributedString. Bypasses Mail.app's HTML parser
+    /// entirely — AppleScript reads the file as «class RTF » styled text and sets it
+    /// as the message content in rich-text mode.
+    var emailBodyRTF: Data {
+        get throws {
+            let attrStr = markdownToAttributedString(content)
 
-    private func markdownToHTML(_ markdown: String) -> String {
-        let lines = markdown.components(separatedBy: "\n")
-        var html = ""
-        var inList = false
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMMM d"
+            let startStr = formatter.string(from: periodStart)
+            let endStr = formatter.string(from: periodEnd)
+            let footer = "\n\nAuto-generated from Claude journal entries from \(startStr) to \(endStr)."
+            let footerAttr = NSAttributedString(string: footer, attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .foregroundColor: NSColor(white: 0.55, alpha: 1)
+            ])
+            let full = NSMutableAttributedString(attributedString: attrStr)
+            full.append(footerAttr)
 
-        for line in lines {
-            if line.hasPrefix("**") && line.hasSuffix("**") && line.count > 4 {
-                if inList { html += "</ul>\n"; inList = false }
-                let text = escapeHTML(String(line.dropFirst(2).dropLast(2)))
-                html += "<h2 style=\"font-size: 16px; font-weight: 600; color: #111; border-bottom: 1px solid #eee; padding-bottom: 6px; margin: 28px 0 10px;\">\(text)</h2>\n"
-            } else if line.hasPrefix("- ") {
-                if !inList { html += "<ul style=\"padding-left: 20px; margin: 0;\">\n"; inList = true }
-                html += "<li style=\"margin-bottom: 8px; line-height: 1.55;\">\(escapeHTML(String(line.dropFirst(2))))</li>\n"
-            } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
-                if inList { html += "</ul>\n"; inList = false }
-            } else {
-                if inList { html += "</ul>\n"; inList = false }
-                html += "<p style=\"line-height: 1.65; margin: 0 0 12px;\">\(escapeHTML(line))</p>\n"
-            }
+            return try full.data(
+                from: NSRange(location: 0, length: full.length),
+                documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+            )
         }
-
-        if inList { html += "</ul>\n" }
-        return html
     }
 
-    private func escapeHTML(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
+    private func markdownToAttributedString(_ markdown: String) -> NSAttributedString {
+        let body = NSFont.systemFont(ofSize: 14)
+        let bold = NSFont.boldSystemFont(ofSize: 14)
+        let dark = NSColor(white: 0.07, alpha: 1)
+
+        let headerStyle: NSMutableParagraphStyle = {
+            let s = NSMutableParagraphStyle()
+            s.paragraphSpacingBefore = 20
+            s.paragraphSpacing = 6
+            return s
+        }()
+        let bulletStyle: NSMutableParagraphStyle = {
+            let s = NSMutableParagraphStyle()
+            s.headIndent = 16
+            s.firstLineHeadIndent = 0
+            s.paragraphSpacing = 5
+            return s
+        }()
+        let paraStyle: NSMutableParagraphStyle = {
+            let s = NSMutableParagraphStyle()
+            s.paragraphSpacing = 8
+            s.lineSpacing = 2
+            return s
+        }()
+
+        let result = NSMutableAttributedString()
+        for line in markdown.components(separatedBy: "\n") {
+            let str: NSAttributedString
+            if line.hasPrefix("**") && line.hasSuffix("**") && line.count > 4 {
+                let text = String(line.dropFirst(2).dropLast(2))
+                str = NSAttributedString(string: text + "\n", attributes: [
+                    .font: bold, .foregroundColor: dark, .paragraphStyle: headerStyle
+                ])
+            } else if line.hasPrefix("- ") {
+                let text = String(line.dropFirst(2))
+                str = NSAttributedString(string: "•  " + text + "\n", attributes: [
+                    .font: body, .foregroundColor: dark, .paragraphStyle: bulletStyle
+                ])
+            } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                str = NSAttributedString(string: "\n")
+            } else {
+                str = NSAttributedString(string: line + "\n", attributes: [
+                    .font: body, .foregroundColor: dark, .paragraphStyle: paraStyle
+                ])
+            }
+            result.append(str)
+        }
+        return result
     }
 }
 
