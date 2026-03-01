@@ -31,9 +31,19 @@ final class EmailService {
 
     /// Send an email using Mail.app via AppleScript.
     private func sendViaMailApp(to recipients: [String], subject: String, htmlBody: String) async throws {
-        // Escape special characters for AppleScript string literals
         let escapedSubject = escapeForAppleScript(subject)
-        let escapedHtml = escapeForAppleScript(htmlBody)
+
+        // Write HTML to a temp file so AppleScript reads it at runtime rather than
+        // embedding it as a compiled string literal. This sidesteps two bugs:
+        // (1) `html content` requires the compose editor (NSTextView) to be
+        //     initialized — it is only created when visible:true is set;
+        // (2) large/complex HTML embedded in AppleScript source is unreliable.
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("therapy_summary_\(Int(Date().timeIntervalSince1970)).html")
+        try htmlBody.write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        let escapedPath = escapeForAppleScript(tempURL.path)
 
         var recipientLines = ""
         for address in recipients {
@@ -41,14 +51,14 @@ final class EmailService {
             recipientLines += "make new to recipient at end of to recipients with properties {address:\"\(escaped)\"}\n"
         }
 
-        // Provide body-only HTML (no <!DOCTYPE html> wrapper) — Mail.app's
-        // `html content` property expects a body fragment. Setting `content`
-        // (plain text) first causes Mail to ignore subsequent `html content`.
+        // visible:true is required so Mail initializes the compose editor before
+        // we set html content. The window briefly appears and closes on send.
         let script = """
         tell application "Mail"
-            set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", visible:false}
+            set htmlText to read POSIX file "\(escapedPath)" as Unicode text
+            set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", visible:true}
             tell newMessage
-                set html content to "\(escapedHtml)"
+                set html content to htmlText
                 \(recipientLines)
             end tell
             send newMessage
