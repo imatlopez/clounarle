@@ -7,22 +7,19 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Generate Summary Now
+        VStack(alignment: .leading, spacing: 2) {
+            // Summary actions
             Button {
-                Task {
-                    await orchestrator.generateNow()
-                }
+                Task { await orchestrator.generateNow() }
             } label: {
-                HStack {
-                    Image(systemName: orchestrator.isGenerating ? "arrow.triangle.2.circlepath" : "text.badge.checkmark")
-                    Text(orchestrator.isGenerating ? "Generating..." : "Generate Summary Now")
-                }
+                Label(
+                    orchestrator.isGenerating ? "Generating..." : "Generate Summary Now",
+                    systemImage: orchestrator.isGenerating ? "arrow.triangle.2.circlepath" : "paperplane"
+                )
             }
             .disabled(orchestrator.isGenerating)
             .keyboardShortcut("g")
 
-            // Preview Summary
             Button {
                 Task {
                     if let summary = await orchestrator.generatePreview() {
@@ -30,61 +27,43 @@ struct MenuBarView: View {
                     }
                 }
             } label: {
-                HStack {
-                    Image(systemName: "eye")
-                    Text("Preview Summary")
-                }
+                Label("Preview Summary", systemImage: "eye")
             }
             .disabled(orchestrator.isGenerating)
             .keyboardShortcut("p")
 
-            Divider()
+            Divider().padding(.vertical, 4)
 
-            // Open Claude Journal Project
             Button {
                 openClaudeProject()
             } label: {
-                HStack {
-                    Image(systemName: "bubble.left.and.text.bubble.right")
-                    Text("Open Claude Journal Project")
-                }
+                Label("Open Journal", systemImage: "arrow.up.forward.app")
             }
             .keyboardShortcut("j")
 
-            Divider()
+            Divider().padding(.vertical, 4)
 
-            // Last Summary Status
-            HStack {
-                Image(systemName: statusIcon)
-                    .foregroundColor(statusColor)
-                Text("Last summary: \(orchestrator.lastStatus.displayString)")
-                    .font(.caption)
-            }
-            .padding(.horizontal, 4)
+            // Status
+            Label(orchestrator.lastStatus.displayString, systemImage: statusIcon)
+                .font(.subheadline)
+                .foregroundStyle(statusColor)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
 
-            Divider()
+            Divider().padding(.vertical, 4)
 
-            // Preferences
+            // App controls
             Button {
                 AppDelegate.shared?.openPreferences()
             } label: {
-                HStack {
-                    Image(systemName: "gear")
-                    Text("Preferences...")
-                }
+                Label("Preferences...", systemImage: "gearshape")
             }
             .keyboardShortcut(",")
 
-            Divider()
-
-            // Quit
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
-                HStack {
-                    Image(systemName: "power")
-                    Text("Quit Therapy Journal")
-                }
+                Label("Quit Therapy Journal", systemImage: "power")
             }
             .keyboardShortcut("q")
         }

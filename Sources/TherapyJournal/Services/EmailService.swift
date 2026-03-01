@@ -43,8 +43,9 @@ final class EmailService {
 
         let script = """
         tell application "Mail"
-            set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", html content:"\(escapedBody)", visible:false}
+            set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", visible:false}
             tell newMessage
+                set html content to "\(escapedBody)"
                 \(recipientLines)
             end tell
             send newMessage
@@ -89,6 +90,9 @@ final class EmailService {
         string
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\r\n", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
     }
 }
 

@@ -207,13 +207,13 @@ enum SummaryStatus: Codable {
         formatter.timeStyle = .short
         switch self {
         case .sent(let date):
-            return "\(formatter.string(from: date)) — sent"
+            return "Sent \(formatter.string(from: date))"
         case .failed(let date, _):
-            return "\(formatter.string(from: date)) — failed"
+            return "Failed \(formatter.string(from: date))"
         case .skipped(let date, _):
-            return "\(formatter.string(from: date)) — skipped"
+            return "Skipped \(formatter.string(from: date))"
         case .none:
-            return "No summary generated yet"
+            return "No summary yet"
         }
     }
 
