@@ -132,6 +132,9 @@ struct JournalSummary {
         return "Therapy prep — \(formatter.string(from: sessionDate))"
     }
 
+    // Body-only HTML (no html/head/body wrapper) with inline styles.
+    // Mail.app's `html content` AppleScript property expects a body fragment,
+    // not a full document — passing <!DOCTYPE html>...</html> is silently discarded.
     var emailBodyHTML: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM d"
@@ -139,24 +142,10 @@ struct JournalSummary {
         let endStr = formatter.string(from: periodEnd)
         let contentHTML = markdownToHTML(content)
         return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta charset="utf-8">
-        <style>
-        body { font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px 24px; color: #222; }
-        h2 { font-size: 16px; font-weight: 600; color: #111; border-bottom: 1px solid #eee; padding-bottom: 6px; margin: 28px 0 10px; }
-        ul { padding-left: 20px; margin: 0; }
-        li { margin-bottom: 8px; line-height: 1.55; }
-        p { line-height: 1.65; margin: 0 0 12px; }
-        .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #eee; color: #888; font-size: 12px; }
-        </style>
-        </head>
-        <body>
+        <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 600px; padding: 20px 24px; color: #222;">
         \(contentHTML)
-        <div class="footer">Auto-generated from Claude journal entries from \(startStr) to \(endStr).</div>
-        </body>
-        </html>
+        <div style="margin-top: 36px; padding-top: 12px; border-top: 1px solid #eee; color: #888; font-size: 12px;">Auto-generated from Claude journal entries from \(startStr) to \(endStr).</div>
+        </div>
         """
     }
 
@@ -169,15 +158,15 @@ struct JournalSummary {
             if line.hasPrefix("**") && line.hasSuffix("**") && line.count > 4 {
                 if inList { html += "</ul>\n"; inList = false }
                 let text = escapeHTML(String(line.dropFirst(2).dropLast(2)))
-                html += "<h2>\(text)</h2>\n"
+                html += "<h2 style=\"font-size: 16px; font-weight: 600; color: #111; border-bottom: 1px solid #eee; padding-bottom: 6px; margin: 28px 0 10px;\">\(text)</h2>\n"
             } else if line.hasPrefix("- ") {
-                if !inList { html += "<ul>\n"; inList = true }
-                html += "<li>\(escapeHTML(String(line.dropFirst(2))))</li>\n"
+                if !inList { html += "<ul style=\"padding-left: 20px; margin: 0;\">\n"; inList = true }
+                html += "<li style=\"margin-bottom: 8px; line-height: 1.55;\">\(escapeHTML(String(line.dropFirst(2))))</li>\n"
             } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
                 if inList { html += "</ul>\n"; inList = false }
             } else {
                 if inList { html += "</ul>\n"; inList = false }
-                html += "<p>\(escapeHTML(line))</p>\n"
+                html += "<p style=\"line-height: 1.65; margin: 0 0 12px;\">\(escapeHTML(line))</p>\n"
             }
         }
 

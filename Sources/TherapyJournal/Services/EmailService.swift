@@ -18,23 +18,22 @@ final class EmailService {
         }
 
         let recipients = [config.userEmail, config.therapistEmail]
-        try await sendToRecipients(recipients, subject: summary.emailSubject, htmlBody: summary.emailBodyHTML, plainBody: summary.content)
+        try await sendToRecipients(recipients, subject: summary.emailSubject, htmlBody: summary.emailBodyHTML)
 
         AppLogger.shared.info("Summary email sent via Mail.app to \(config.userEmail) and \(config.therapistEmail)")
     }
 
     /// Send the summary to an explicit list of recipients (used for preview / "send to me only").
-    func sendToRecipients(_ recipients: [String], subject: String, htmlBody: String, plainBody: String) async throws {
-        try await sendViaMailApp(to: recipients, subject: subject, htmlBody: htmlBody, plainBody: plainBody)
+    func sendToRecipients(_ recipients: [String], subject: String, htmlBody: String) async throws {
+        try await sendViaMailApp(to: recipients, subject: subject, htmlBody: htmlBody)
         AppLogger.shared.info("Email sent via Mail.app to \(recipients.joined(separator: ", "))")
     }
 
     /// Send an email using Mail.app via AppleScript.
-    private func sendViaMailApp(to recipients: [String], subject: String, htmlBody: String, plainBody: String) async throws {
+    private func sendViaMailApp(to recipients: [String], subject: String, htmlBody: String) async throws {
         // Escape special characters for AppleScript string literals
         let escapedSubject = escapeForAppleScript(subject)
         let escapedHtml = escapeForAppleScript(htmlBody)
-        let escapedPlain = escapeForAppleScript(plainBody)
 
         var recipientLines = ""
         for address in recipients {
@@ -42,13 +41,13 @@ final class EmailService {
             recipientLines += "make new to recipient at end of to recipients with properties {address:\"\(escaped)\"}\n"
         }
 
-        // Set both content (plain) and html content so Mail creates a proper
-        // multipart message. html content alone is silently ignored by Mail.app.
+        // Provide body-only HTML (no <!DOCTYPE html> wrapper) — Mail.app's
+        // `html content` property expects a body fragment. Setting `content`
+        // (plain text) first causes Mail to ignore subsequent `html content`.
         let script = """
         tell application "Mail"
             set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", visible:false}
             tell newMessage
-                set content to "\(escapedPlain)"
                 set html content to "\(escapedHtml)"
                 \(recipientLines)
             end tell
