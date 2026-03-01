@@ -179,7 +179,11 @@ struct JournalSummary: Codable {
     /// as the message content in rich-text mode.
     var emailBodyRTF: Data {
         get throws {
-            let attrStr = markdownToAttributedString(content)
+            let stripped = content
+                .components(separatedBy: "\n")
+                .filter { $0.trimmingCharacters(in: .whitespaces).range(of: #"^-{2,}$"#, options: .regularExpression) == nil }
+                .joined(separator: "\n")
+            let attrStr = markdownToAttributedString(stripped)
 
             let formatter = DateFormatter()
             formatter.dateFormat = "MMMM d"
@@ -227,25 +231,49 @@ struct JournalSummary: Codable {
 
         let result = NSMutableAttributedString()
         for line in markdown.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
             let str: NSAttributedString
-            if line.hasPrefix("**") && line.hasSuffix("**") && line.count > 4 {
-                let text = String(line.dropFirst(2).dropLast(2))
+            if trimmed.hasPrefix("**") && trimmed.hasSuffix("**") && trimmed.count > 4 {
+                let text = String(trimmed.dropFirst(2).dropLast(2))
                 str = NSAttributedString(string: text + "\n", attributes: [
                     .font: bold, .foregroundColor: dark, .paragraphStyle: headerStyle
                 ])
+            } else if trimmed.range(of: #"^-{2,}$"#, options: .regularExpression) != nil {
+                str = NSAttributedString(string: "\n")
             } else if line.hasPrefix("- ") {
                 let text = String(line.dropFirst(2))
-                str = NSAttributedString(string: "•  " + text + "\n", attributes: [
-                    .font: body, .foregroundColor: dark, .paragraphStyle: bulletStyle
-                ])
-            } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                let inline = parseInline(text, font: body, bold: bold, color: dark, style: bulletStyle)
+                let bullet = NSMutableAttributedString(string: "•  ")
+                bullet.addAttributes([.font: body, .foregroundColor: dark, .paragraphStyle: bulletStyle],
+                                     range: NSRange(location: 0, length: bullet.length))
+                bullet.append(inline)
+                bullet.append(NSAttributedString(string: "\n"))
+                str = bullet
+            } else if trimmed.isEmpty {
                 str = NSAttributedString(string: "\n")
             } else {
-                str = NSAttributedString(string: line + "\n", attributes: [
-                    .font: body, .foregroundColor: dark, .paragraphStyle: paraStyle
-                ])
+                let inline = parseInline(line, font: body, bold: bold, color: dark, style: paraStyle)
+                let para = NSMutableAttributedString(attributedString: inline)
+                para.append(NSAttributedString(string: "\n"))
+                str = para
             }
             result.append(str)
+        }
+        return result
+    }
+
+    private func parseInline(_ text: String, font: NSFont, bold: NSFont,
+                              color: NSColor, style: NSParagraphStyle) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+        var isBold = false
+        for part in text.components(separatedBy: "**") {
+            guard !part.isEmpty else { isBold.toggle(); continue }
+            result.append(NSAttributedString(string: part, attributes: [
+                .font: isBold ? bold : font,
+                .foregroundColor: color,
+                .paragraphStyle: style
+            ]))
+            isBold.toggle()
         }
         return result
     }
