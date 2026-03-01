@@ -10,6 +10,7 @@ struct AppConfig: Codable {
     var claudeProjectURL: String
     var summaryLanguage: String
     var launchAtLogin: Bool
+    var lastSessionDate: Date?
 
     // Cached values resolved at runtime — not user-editable
     var cachedOrgID: String
@@ -23,6 +24,7 @@ struct AppConfig: Codable {
         claudeProjectURL: "",
         summaryLanguage: "English",
         launchAtLogin: false,
+        lastSessionDate: nil,
         cachedOrgID: "",
         cachedProjectID: ""
     )
@@ -130,17 +132,64 @@ struct JournalSummary {
         return "Therapy prep — \(formatter.string(from: sessionDate))"
     }
 
-    var emailBody: String {
+    var emailBodyHTML: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM d"
         let startStr = formatter.string(from: periodStart)
         let endStr = formatter.string(from: periodEnd)
+        let contentHTML = markdownToHTML(content)
         return """
-        \(content)
-
-        ---
-        This summary was auto-generated from your Claude journal entries from \(startStr) to \(endStr).
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style>
+        body { font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px 24px; color: #222; }
+        h2 { font-size: 16px; font-weight: 600; color: #111; border-bottom: 1px solid #eee; padding-bottom: 6px; margin: 28px 0 10px; }
+        ul { padding-left: 20px; margin: 0; }
+        li { margin-bottom: 8px; line-height: 1.55; }
+        p { line-height: 1.65; margin: 0 0 12px; }
+        .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #eee; color: #888; font-size: 12px; }
+        </style>
+        </head>
+        <body>
+        \(contentHTML)
+        <div class="footer">Auto-generated from Claude journal entries from \(startStr) to \(endStr).</div>
+        </body>
+        </html>
         """
+    }
+
+    private func markdownToHTML(_ markdown: String) -> String {
+        let lines = markdown.components(separatedBy: "\n")
+        var html = ""
+        var inList = false
+
+        for line in lines {
+            if line.hasPrefix("**") && line.hasSuffix("**") && line.count > 4 {
+                if inList { html += "</ul>\n"; inList = false }
+                let text = escapeHTML(String(line.dropFirst(2).dropLast(2)))
+                html += "<h2>\(text)</h2>\n"
+            } else if line.hasPrefix("- ") {
+                if !inList { html += "<ul>\n"; inList = true }
+                html += "<li>\(escapeHTML(String(line.dropFirst(2))))</li>\n"
+            } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                if inList { html += "</ul>\n"; inList = false }
+            } else {
+                if inList { html += "</ul>\n"; inList = false }
+                html += "<p>\(escapeHTML(line))</p>\n"
+            }
+        }
+
+        if inList { html += "</ul>\n" }
+        return html
+    }
+
+    private func escapeHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }
 
@@ -149,6 +198,7 @@ struct JournalSummary {
 enum SummaryStatus: Codable {
     case sent(date: Date)
     case failed(date: Date, error: String)
+    case skipped(date: Date, reason: String)
     case none
 
     var displayString: String {
@@ -160,13 +210,15 @@ enum SummaryStatus: Codable {
             return "\(formatter.string(from: date)) — sent"
         case .failed(let date, _):
             return "\(formatter.string(from: date)) — failed"
+        case .skipped(let date, _):
+            return "\(formatter.string(from: date)) — skipped"
         case .none:
             return "No summary generated yet"
         }
     }
 
     enum CodingKeys: String, CodingKey {
-        case type, date, error
+        case type, date, error, reason
     }
 
     init(from decoder: Decoder) throws {
@@ -180,6 +232,10 @@ enum SummaryStatus: Codable {
             let date = try container.decode(Date.self, forKey: .date)
             let error = try container.decode(String.self, forKey: .error)
             self = .failed(date: date, error: error)
+        case "skipped":
+            let date = try container.decode(Date.self, forKey: .date)
+            let reason = try container.decode(String.self, forKey: .reason)
+            self = .skipped(date: date, reason: reason)
         default:
             self = .none
         }
@@ -195,6 +251,10 @@ enum SummaryStatus: Codable {
             try container.encode("failed", forKey: .type)
             try container.encode(date, forKey: .date)
             try container.encode(error, forKey: .error)
+        case .skipped(let date, let reason):
+            try container.encode("skipped", forKey: .type)
+            try container.encode(date, forKey: .date)
+            try container.encode(reason, forKey: .reason)
         case .none:
             try container.encode("none", forKey: .type)
         }

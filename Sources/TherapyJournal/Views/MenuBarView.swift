@@ -22,6 +22,22 @@ struct MenuBarView: View {
             .disabled(orchestrator.isGenerating)
             .keyboardShortcut("g")
 
+            // Preview Summary
+            Button {
+                Task {
+                    if let summary = await orchestrator.generatePreview() {
+                        AppDelegate.shared?.openSummaryPreview(summary: summary)
+                    }
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "eye")
+                    Text("Preview Summary")
+                }
+            }
+            .disabled(orchestrator.isGenerating)
+            .keyboardShortcut("p")
+
             Divider()
 
             // Open Claude Journal Project
@@ -82,6 +98,7 @@ struct MenuBarView: View {
         switch orchestrator.lastStatus {
         case .sent: return "checkmark.circle.fill"
         case .failed: return "exclamationmark.triangle.fill"
+        case .skipped: return "exclamationmark.circle"
         case .none: return "minus.circle"
         }
     }
@@ -90,6 +107,7 @@ struct MenuBarView: View {
         switch orchestrator.lastStatus {
         case .sent: return .green
         case .failed: return .red
+        case .skipped: return .yellow
         case .none: return .secondary
         }
     }

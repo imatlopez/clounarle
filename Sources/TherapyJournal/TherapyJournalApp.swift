@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var preferencesWindow: NSWindow?
+    private var previewWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
@@ -101,10 +102,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         preferencesWindow?.makeKeyAndOrderFront(nil)
     }
 
+    // MARK: - Summary Preview Window
+
+    func openSummaryPreview(summary: JournalSummary) {
+        popover?.performClose(nil)
+
+        let previewView = SummaryPreviewView(summary: summary)
+        let hostingController = NSHostingController(rootView: previewView)
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Summary Preview"
+        window.styleMask = [.titled, .closable]
+        window.setContentSize(NSSize(width: 600, height: 520))
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.delegate = self
+        self.previewWindow = window
+
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
     // MARK: - NSWindowDelegate
 
     nonisolated func windowWillClose(_ notification: Notification) {
-        // Return to accessory (background) mode when Preferences closes
+        // Return to accessory (background) mode when any app window closes
         _ = MainActor.assumeIsolated {
             NSApp.setActivationPolicy(.accessory)
         }

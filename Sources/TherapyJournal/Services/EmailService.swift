@@ -7,7 +7,7 @@ final class EmailService {
 
     private init() {}
 
-    /// Send the therapy summary email via the local Mail.app.
+    /// Send the therapy summary email via the local Mail.app to user + therapist.
     func sendSummaryEmail(summary: JournalSummary) async throws {
         let config = AppConfig.load()
         guard !config.userEmail.isEmpty else {
@@ -18,12 +18,15 @@ final class EmailService {
         }
 
         let recipients = [config.userEmail, config.therapistEmail]
-        let subject = summary.emailSubject
-        let body = summary.emailBody
-
-        try await sendViaMailApp(to: recipients, subject: subject, body: body)
+        try await sendToRecipients(recipients, subject: summary.emailSubject, body: summary.emailBodyHTML)
 
         AppLogger.shared.info("Summary email sent via Mail.app to \(config.userEmail) and \(config.therapistEmail)")
+    }
+
+    /// Send the summary to an explicit list of recipients (used for preview / "send to me only").
+    func sendToRecipients(_ recipients: [String], subject: String, body: String) async throws {
+        try await sendViaMailApp(to: recipients, subject: subject, body: body)
+        AppLogger.shared.info("Email sent via Mail.app to \(recipients.joined(separator: ", "))")
     }
 
     /// Send an email using Mail.app via AppleScript.
@@ -40,7 +43,7 @@ final class EmailService {
 
         let script = """
         tell application "Mail"
-            set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", content:"\(escapedBody)", visible:false}
+            set newMessage to make new outgoing message with properties {subject:"\(escapedSubject)", html content:"\(escapedBody)", visible:false}
             tell newMessage
                 \(recipientLines)
             end tell

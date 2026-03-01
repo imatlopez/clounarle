@@ -19,21 +19,22 @@ final class SummaryOrchestrator: ObservableObject {
         do {
             AppLogger.shared.info("Starting summary pipeline for session: \(event.title)")
 
-            // Determine the period to fetch (last 7 days)
-            let periodEnd = Date()
-            let periodStart = Calendar.current.date(byAdding: .day, value: -7, to: periodEnd)!
+            let (periodStart, periodEnd) = fetchPeriod()
 
             // Step 1: Fetch journal conversations
             AppLogger.shared.info("Fetching journal conversations since \(periodStart)...")
             let conversations = try await ClaudeConversationFetcher.shared.fetchRecentJournalEntries(since: periodStart)
 
             guard !conversations.isEmpty else {
-                AppLogger.shared.warn("No journal entries found for the past week")
-                updateStatus(.failed(date: Date(), error: "No journal entries found"))
+                let reason = "No journal entries found since \(periodStart.formatted(date: .abbreviated, time: .omitted)). Report skipped."
+                AppLogger.shared.warn(reason)
+                updateStatus(.skipped(date: Date(), reason: reason))
+                NotificationManager.shared.notifyReportSkipped(reason: reason)
+                isGenerating = false
                 return
             }
 
-            // Step 2: Generate summary via Claude API
+            // Step 2: Generate summary
             AppLogger.shared.info("Generating summary from \(conversations.count) conversations...")
             let summary = try await SummaryGenerator.shared.generateSummary(
                 conversations: conversations,
@@ -46,7 +47,8 @@ final class SummaryOrchestrator: ObservableObject {
             AppLogger.shared.info("Sending summary email...")
             try await EmailService.shared.sendSummaryEmail(summary: summary)
 
-            // Success
+            // Success — persist session date so next run covers from here
+            saveLastSessionDate(event.startDate)
             updateStatus(.sent(date: Date()))
             NotificationManager.shared.notifySummarySent(sessionDate: event.startDate)
             AppLogger.shared.info("Summary pipeline completed successfully")
@@ -65,11 +67,9 @@ final class SummaryOrchestrator: ObservableObject {
         isGenerating = true
 
         do {
-            // Check if there's a session tomorrow
             if let event = try await CalendarService.shared.checkForTomorrowSession() {
                 await runSummaryPipeline(for: event)
             } else {
-                // No session found — generate anyway with today's date
                 let placeholder = TherapyEvent(
                     title: "Manual Summary",
                     startDate: Date(),
@@ -83,6 +83,63 @@ final class SummaryOrchestrator: ObservableObject {
             updateStatus(.failed(date: Date(), error: error.localizedDescription))
             isGenerating = false
         }
+    }
+
+    /// Preview mode: fetch and generate summary without sending email.
+    /// Returns the summary on success, nil on failure.
+    func generatePreview() async -> JournalSummary? {
+        isGenerating = true
+        defer { isGenerating = false }
+
+        do {
+            let (periodStart, periodEnd) = fetchPeriod()
+
+            AppLogger.shared.info("Generating preview — fetching conversations since \(periodStart)...")
+            let conversations = try await ClaudeConversationFetcher.shared.fetchRecentJournalEntries(since: periodStart)
+
+            guard !conversations.isEmpty else {
+                let reason = "No journal entries found since \(periodStart.formatted(date: .abbreviated, time: .omitted))."
+                AppLogger.shared.warn(reason)
+                updateStatus(.skipped(date: Date(), reason: reason))
+                NotificationManager.shared.notifyReportSkipped(reason: reason)
+                return nil
+            }
+
+            AppLogger.shared.info("Generating preview summary from \(conversations.count) conversations...")
+            let sessionDate = (try? await CalendarService.shared.checkForTomorrowSession())?.startDate ?? Date()
+            let summary = try await SummaryGenerator.shared.generateSummary(
+                conversations: conversations,
+                sessionDate: sessionDate,
+                periodStart: periodStart,
+                periodEnd: periodEnd
+            )
+
+            AppLogger.shared.info("Preview summary generated successfully")
+            return summary
+
+        } catch {
+            AppLogger.shared.error("Preview generation failed: \(error.localizedDescription)")
+            updateStatus(.failed(date: Date(), error: error.localizedDescription))
+            return nil
+        }
+    }
+
+    // MARK: - Time Window
+
+    /// Returns (periodStart, periodEnd) — start is lastSessionDate if saved, else 7-day fallback.
+    private func fetchPeriod() -> (Date, Date) {
+        let periodEnd = Date()
+        let config = AppConfig.load()
+        let periodStart = config.lastSessionDate
+            ?? Calendar.current.date(byAdding: .day, value: -7, to: periodEnd)!
+        return (periodStart, periodEnd)
+    }
+
+    private func saveLastSessionDate(_ date: Date) {
+        var config = AppConfig.load()
+        config.lastSessionDate = date
+        try? config.save()
+        AppLogger.shared.info("Saved lastSessionDate: \(date)")
     }
 
     // MARK: - Status Persistence

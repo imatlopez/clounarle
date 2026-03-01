@@ -72,4 +72,12 @@ final class NotificationManager {
             identifier: "summary-sent"
         )
     }
+
+    func notifyReportSkipped(reason: String) {
+        sendNotification(
+            title: "Therapy Journal — Report Skipped",
+            body: reason,
+            identifier: "report-skipped"
+        )
+    }
 }
