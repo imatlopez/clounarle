@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Foundation
 
 // MARK: - App Configuration
@@ -12,6 +13,7 @@ struct AppConfig: Codable {
     var summaryLanguage: String
     var launchAtLogin: Bool
     var lastSessionDate: Date?
+    var alwaysRegenerate: Bool
 
     // Cached values resolved at runtime — not user-editable
     var cachedOrgID: String
@@ -26,9 +28,44 @@ struct AppConfig: Codable {
         summaryLanguage: "English",
         launchAtLogin: false,
         lastSessionDate: nil,
+        alwaysRegenerate: false,
         cachedOrgID: "",
         cachedProjectID: ""
     )
+
+    init(
+        userEmail: String, therapistEmail: String, calendarKeyword: String,
+        summarySendTime: DateComponents, claudeProjectURL: String, summaryLanguage: String,
+        launchAtLogin: Bool, lastSessionDate: Date?, alwaysRegenerate: Bool,
+        cachedOrgID: String, cachedProjectID: String
+    ) {
+        self.userEmail = userEmail
+        self.therapistEmail = therapistEmail
+        self.calendarKeyword = calendarKeyword
+        self.summarySendTime = summarySendTime
+        self.claudeProjectURL = claudeProjectURL
+        self.summaryLanguage = summaryLanguage
+        self.launchAtLogin = launchAtLogin
+        self.lastSessionDate = lastSessionDate
+        self.alwaysRegenerate = alwaysRegenerate
+        self.cachedOrgID = cachedOrgID
+        self.cachedProjectID = cachedProjectID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        userEmail = try container.decode(String.self, forKey: .userEmail)
+        therapistEmail = try container.decode(String.self, forKey: .therapistEmail)
+        calendarKeyword = try container.decode(String.self, forKey: .calendarKeyword)
+        summarySendTime = try container.decode(DateComponents.self, forKey: .summarySendTime)
+        claudeProjectURL = try container.decode(String.self, forKey: .claudeProjectURL)
+        summaryLanguage = try container.decode(String.self, forKey: .summaryLanguage)
+        launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
+        lastSessionDate = try container.decodeIfPresent(Date.self, forKey: .lastSessionDate)
+        alwaysRegenerate = try container.decodeIfPresent(Bool.self, forKey: .alwaysRegenerate) ?? false
+        cachedOrgID = try container.decode(String.self, forKey: .cachedOrgID)
+        cachedProjectID = try container.decode(String.self, forKey: .cachedProjectID)
+    }
 
     /// Extract the project UUID from the project URL.
     /// Handles: claude.ai/project/{uuid} or claude.ai/project/{org}/{uuid}
@@ -120,12 +157,16 @@ struct ClaudeConversationDetail: Codable {
 
 // MARK: - Summary
 
-struct JournalSummary {
+struct JournalSummary: Codable {
     let content: String
     let generatedAt: Date
     let periodStart: Date
     let periodEnd: Date
     let sessionDate: Date
+
+    enum CodingKeys: String, CodingKey {
+        case content, generatedAt, periodStart, periodEnd, sessionDate
+    }
 
     var emailSubject: String {
         let formatter = DateFormatter()
@@ -207,6 +248,43 @@ struct JournalSummary {
             result.append(str)
         }
         return result
+    }
+}
+
+// MARK: - Cached Summary
+
+struct CachedSummary: Codable {
+    let cacheKey: String
+    let summary: JournalSummary
+    let cachedAt: Date
+
+    static let fileURL: URL = {
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("TherapyJournal", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("cached_summary.json")
+    }()
+
+    static func cacheKey(for conversations: [ClaudeConversation]) -> String {
+        let input = conversations
+            .sorted { $0.uuid < $1.uuid }
+            .map { "\($0.uuid):\($0.updatedAt)" }
+            .joined(separator: "|")
+        let digest = SHA256.hash(data: Data(input.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func load() -> CachedSummary? {
+        guard let data = try? Data(contentsOf: fileURL),
+              let cached = try? JSONDecoder().decode(CachedSummary.self, from: data) else {
+            return nil
+        }
+        return cached
+    }
+
+    func save() throws {
+        let data = try JSONEncoder().encode(self)
+        try data.write(to: Self.fileURL, options: .atomic)
     }
 }
 

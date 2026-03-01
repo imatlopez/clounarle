@@ -78,6 +78,10 @@ struct PreferencesView: View {
 
             Section {
                 Toggle("Launch at Login", isOn: $config.launchAtLogin)
+                Toggle("Always regenerate summaries", isOn: $config.alwaysRegenerate)
+                Text("Ignores cached summaries and always calls Claude. Uses more quota.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             HStack {

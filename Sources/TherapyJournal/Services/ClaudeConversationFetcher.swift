@@ -60,8 +60,8 @@ final class ClaudeConversationFetcher {
         return orgID
     }
 
-    /// Fetch recent conversations from the user's Claude.ai journal project.
-    func fetchRecentJournalEntries(since: Date) async throws -> [ClaudeConversationDetail] {
+    /// List recent conversations (cheap API call) without fetching full message details.
+    func listRecentConversations(since: Date) async throws -> [ClaudeConversation] {
         let config = AppConfig.load()
         let projectID = config.projectID
         guard !projectID.isEmpty else {
@@ -71,29 +71,33 @@ final class ClaudeConversationFetcher {
         let sessionKey = try getSessionKey()
         let orgID = try await resolveOrgID(sessionKey: sessionKey)
 
-        // Step 1: List conversations in the project
         let conversations = try await listProjectConversations(
             orgID: orgID,
             projectID: projectID,
             sessionKey: sessionKey
         )
 
-        // Step 2: Filter to conversations updated since the start date
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
-        let recentConversations = conversations.filter { convo in
+        let recent = conversations.filter { convo in
             if let updatedDate = formatter.date(from: convo.updatedAt) {
                 return updatedDate >= since
             }
             return false
         }
 
-        AppLogger.shared.info("Found \(recentConversations.count) conversations since \(since)")
+        AppLogger.shared.info("Found \(recent.count) conversations since \(since)")
+        return recent
+    }
 
-        // Step 3: Fetch full details for each recent conversation
+    /// Fetch full message details for the given conversations.
+    func fetchConversationDetails(for conversations: [ClaudeConversation]) async throws -> [ClaudeConversationDetail] {
+        let sessionKey = try getSessionKey()
+        let orgID = try await resolveOrgID(sessionKey: sessionKey)
+
         var details: [ClaudeConversationDetail] = []
-        for convo in recentConversations {
+        for convo in conversations {
             do {
                 let detail = try await fetchConversationDetail(
                     orgID: orgID,
@@ -105,8 +109,13 @@ final class ClaudeConversationFetcher {
                 AppLogger.shared.warn("Failed to fetch conversation \(convo.uuid): \(error)")
             }
         }
-
         return details
+    }
+
+    /// Fetch recent conversations from the user's Claude.ai journal project.
+    func fetchRecentJournalEntries(since: Date) async throws -> [ClaudeConversationDetail] {
+        let conversations = try await listRecentConversations(since: since)
+        return try await fetchConversationDetails(for: conversations)
     }
 
     // MARK: - API Calls

@@ -21,9 +21,9 @@ final class SummaryOrchestrator: ObservableObject {
 
             let (periodStart, periodEnd) = fetchPeriod()
 
-            // Step 1: Fetch journal conversations
+            // Step 1: List journal conversations (cheap)
             AppLogger.shared.info("Fetching journal conversations since \(periodStart)...")
-            let conversations = try await ClaudeConversationFetcher.shared.fetchRecentJournalEntries(since: periodStart)
+            let conversations = try await ClaudeConversationFetcher.shared.listRecentConversations(since: periodStart)
 
             guard !conversations.isEmpty else {
                 let reason = "No journal entries found since \(periodStart.formatted(date: .abbreviated, time: .omitted)). Report skipped."
@@ -34,14 +34,27 @@ final class SummaryOrchestrator: ObservableObject {
                 return
             }
 
-            // Step 2: Generate summary
-            AppLogger.shared.info("Generating summary from \(conversations.count) conversations...")
-            let summary = try await SummaryGenerator.shared.generateSummary(
-                conversations: conversations,
-                sessionDate: event.startDate,
-                periodStart: periodStart,
-                periodEnd: periodEnd
-            )
+            // Step 2: Check cache or generate summary
+            let summary: JournalSummary
+            let config = AppConfig.load()
+            let key = CachedSummary.cacheKey(for: conversations)
+
+            if !config.alwaysRegenerate,
+               let cached = CachedSummary.load(),
+               cached.cacheKey == key {
+                AppLogger.shared.info("Using cached summary (key: \(key.prefix(12))...)")
+                summary = cached.summary
+            } else {
+                let details = try await ClaudeConversationFetcher.shared.fetchConversationDetails(for: conversations)
+                AppLogger.shared.info("Generating summary from \(details.count) conversations...")
+                summary = try await SummaryGenerator.shared.generateSummary(
+                    conversations: details,
+                    sessionDate: event.startDate,
+                    periodStart: periodStart,
+                    periodEnd: periodEnd
+                )
+                try? CachedSummary(cacheKey: key, summary: summary, cachedAt: Date()).save()
+            }
 
             // Step 3: Send email via Mail.app
             AppLogger.shared.info("Sending summary email...")
@@ -95,7 +108,7 @@ final class SummaryOrchestrator: ObservableObject {
             let (periodStart, periodEnd) = fetchPeriod()
 
             AppLogger.shared.info("Generating preview — fetching conversations since \(periodStart)...")
-            let conversations = try await ClaudeConversationFetcher.shared.fetchRecentJournalEntries(since: periodStart)
+            let conversations = try await ClaudeConversationFetcher.shared.listRecentConversations(since: periodStart)
 
             guard !conversations.isEmpty else {
                 let reason = "No journal entries found since \(periodStart.formatted(date: .abbreviated, time: .omitted))."
@@ -105,14 +118,26 @@ final class SummaryOrchestrator: ObservableObject {
                 return nil
             }
 
-            AppLogger.shared.info("Generating preview summary from \(conversations.count) conversations...")
+            let config = AppConfig.load()
+            let key = CachedSummary.cacheKey(for: conversations)
+
+            if !config.alwaysRegenerate,
+               let cached = CachedSummary.load(),
+               cached.cacheKey == key {
+                AppLogger.shared.info("Using cached summary for preview (key: \(key.prefix(12))...)")
+                return cached.summary
+            }
+
+            let details = try await ClaudeConversationFetcher.shared.fetchConversationDetails(for: conversations)
+            AppLogger.shared.info("Generating preview summary from \(details.count) conversations...")
             let sessionDate = (try? await CalendarService.shared.checkForTomorrowSession())?.startDate ?? Date()
             let summary = try await SummaryGenerator.shared.generateSummary(
-                conversations: conversations,
+                conversations: details,
                 sessionDate: sessionDate,
                 periodStart: periodStart,
                 periodEnd: periodEnd
             )
+            try? CachedSummary(cacheKey: key, summary: summary, cachedAt: Date()).save()
 
             AppLogger.shared.info("Preview summary generated successfully")
             return summary
