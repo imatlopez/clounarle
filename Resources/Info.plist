@@ -16,6 +16,10 @@
     <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>TherapyJournal</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>26.0</string>
     <key>LSUIElement</key>

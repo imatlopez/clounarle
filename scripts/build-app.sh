@@ -22,6 +22,7 @@ cp "$REPO/Resources/Info.plist" "$CONTENTS/Info.plist"
 
 # Resources
 cp "$REPO/Resources/JournalingSystemPrompt.txt" "$CONTENTS/Resources/JournalingSystemPrompt.txt"
+cp "$REPO/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 
 echo "→ Signing..."
 # Explicitly set the bundle ID as the code-signing identifier so macOS TCC

@@ -18,6 +18,7 @@ struct TherapyJournalApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     static var shared: AppDelegate?
+    static var appIcon: NSImage?
 
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
@@ -28,6 +29,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         AppDelegate.shared = self
 
         AppLogger.shared.info("Therapy Journal starting up")
+
+        // Load the Dock icon (SPM bundles don't auto-resolve CFBundleIconFile)
+        let iconURL = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Resources/AppIcon.icns")
+        if let icon = NSImage(contentsOf: iconURL) {
+            Self.appIcon = icon
+            NSApp.applicationIconImage = icon
+        }
 
         // Request notification permission
         NotificationManager.shared.requestPermission()
@@ -98,6 +107,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // LSUIElement apps must temporarily become regular to accept keyboard input
         NSApp.setActivationPolicy(.regular)
+        NSApp.applicationIconImage = Self.appIcon
         NSApp.activate(ignoringOtherApps: true)
         preferencesWindow?.makeKeyAndOrderFront(nil)
     }
@@ -120,6 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.previewWindow = window
 
         NSApp.setActivationPolicy(.regular)
+        NSApp.applicationIconImage = Self.appIcon
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
     }
