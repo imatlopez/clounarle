@@ -84,7 +84,8 @@ struct SummaryPreviewView: View {
             try await EmailService.shared.sendToRecipients(
                 [config.userEmail],
                 subject: summary.emailSubject,
-                body: summary.emailBodyHTML
+                htmlBody: summary.emailBodyHTML,
+                plainBody: summary.content
             )
             sentConfirmation = true
         } catch {

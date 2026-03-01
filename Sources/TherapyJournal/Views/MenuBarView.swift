@@ -16,6 +16,8 @@ struct MenuBarView: View {
                     orchestrator.isGenerating ? "Generating..." : "Generate Summary Now",
                     systemImage: orchestrator.isGenerating ? "arrow.triangle.2.circlepath" : "paperplane"
                 )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .disabled(orchestrator.isGenerating)
             .keyboardShortcut("g")
@@ -28,6 +30,8 @@ struct MenuBarView: View {
                 }
             } label: {
                 Label("Preview Summary", systemImage: "eye")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .disabled(orchestrator.isGenerating)
             .keyboardShortcut("p")
@@ -38,6 +42,8 @@ struct MenuBarView: View {
                 openClaudeProject()
             } label: {
                 Label("Open Journal", systemImage: "arrow.up.forward.app")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .keyboardShortcut("j")
 
@@ -47,6 +53,7 @@ struct MenuBarView: View {
             Label(orchestrator.lastStatus.displayString, systemImage: statusIcon)
                 .font(.subheadline)
                 .foregroundStyle(statusColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
 
@@ -57,6 +64,8 @@ struct MenuBarView: View {
                 AppDelegate.shared?.openPreferences()
             } label: {
                 Label("Preferences...", systemImage: "gearshape")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .keyboardShortcut(",")
 
@@ -64,6 +73,8 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Label("Quit Therapy Journal", systemImage: "power")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
             .keyboardShortcut("q")
         }
