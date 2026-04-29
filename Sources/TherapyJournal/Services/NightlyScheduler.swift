@@ -8,9 +8,13 @@ final class NightlyScheduler {
     private var timer: Timer?
     private var isRunning = false
 
+    /// In-memory guard so a transient pipeline failure doesn't get retried every minute.
+    /// Keyed by `event.startDate`; cleared on relaunch so a fresh attempt is possible.
+    private var attemptedEventDate: Date?
+
     private init() {}
 
-    /// Start the nightly scheduler. Checks every minute if it's time to run.
+    /// Start the scheduler. Checks immediately (catch-up) and once per minute thereafter.
     func start() {
         guard !isRunning else { return }
         isRunning = true
@@ -19,11 +23,12 @@ final class NightlyScheduler {
 
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.checkIfTimeToRun()
+                await self?.tickIfDue()
             }
         }
-        // Also check immediately on start
-        checkIfTimeToRun()
+        Task { @MainActor in
+            await tickIfDue()
+        }
     }
 
     func stop() {
@@ -33,54 +38,58 @@ final class NightlyScheduler {
         AppLogger.shared.info("Nightly scheduler stopped")
     }
 
-    // MARK: - Check Logic
+    // MARK: - Due Check
 
-    private var lastRunDate: String?
-
-    private func checkIfTimeToRun() {
+    /// Single check that handles both the regular schedule and on-launch catch-up:
+    /// fires whenever there's an upcoming therapy event whose scheduled fire-time has
+    /// passed and which hasn't already been sent for.
+    private func tickIfDue() async {
         let config = AppConfig.load()
-        let calendar = Calendar.current
-        let now = Date()
+        let leadDays = max(1, config.summaryLeadDays)
 
-        let targetHour = config.summarySendTime.hour ?? 20
-        let targetMinute = config.summarySendTime.minute ?? 0
+        let event: TherapyEvent?
+        do {
+            event = try await CalendarService.shared.findUpcomingSession(daysAhead: leadDays)
+        } catch {
+            AppLogger.shared.error("Calendar lookup failed: \(error.localizedDescription)")
+            return
+        }
+        guard let event else { return }
 
-        let currentHour = calendar.component(.hour, from: now)
-        let currentMinute = calendar.component(.minute, from: now)
+        let cal = Calendar.current
 
-        // Check if we're at the target time (within the same minute)
-        guard currentHour == targetHour && currentMinute == targetMinute else {
+        if let lastSent = config.lastSessionDate,
+           cal.isDate(lastSent, inSameDayAs: event.startDate) {
             return
         }
 
-        // Prevent running more than once per day
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let todayString = dateFormatter.string(from: now)
-
-        guard lastRunDate != todayString else { return }
-        lastRunDate = todayString
-
-        AppLogger.shared.info("Nightly check triggered at \(targetHour):\(String(format: "%02d", targetMinute))")
-
-        Task {
-            await runNightlyCheck()
+        if let attempted = attemptedEventDate,
+           cal.isDate(attempted, inSameDayAs: event.startDate) {
+            return
         }
+
+        let fireTime = scheduledFireTime(for: event, config: config)
+        guard Date() >= fireTime else { return }
+
+        AppLogger.shared.info("Scheduled fire-time reached for \(event.title) — running pipeline")
+        attemptedEventDate = event.startDate
+        await SummaryOrchestrator.shared.runSummaryPipeline(for: event)
     }
 
-    private func runNightlyCheck() async {
-        do {
-            guard let event = try await CalendarService.shared.checkForTomorrowSession() else {
-                AppLogger.shared.info("No therapy session tomorrow — skipping summary")
-                return
-            }
-
-            AppLogger.shared.info("Therapy session found tomorrow: \(event.title). Triggering summary pipeline.")
-            await SummaryOrchestrator.shared.runSummaryPipeline(for: event)
-
-        } catch {
-            AppLogger.shared.error("Nightly check failed: \(error.localizedDescription)")
-            // Silently log and retry next night as specified
+    /// Scheduled fire instant: `summaryLeadDays` days before the event's day, at the
+    /// configured `summarySendTime`.
+    private func scheduledFireTime(for event: TherapyEvent, config: AppConfig) -> Date {
+        let cal = Calendar.current
+        let leadDays = max(1, config.summaryLeadDays)
+        let eventDay = cal.startOfDay(for: event.startDate)
+        guard let fireDay = cal.date(byAdding: .day, value: -leadDays, to: eventDay) else {
+            return event.startDate
         }
+        return cal.date(
+            bySettingHour: config.summarySendTime.hour ?? 20,
+            minute: config.summarySendTime.minute ?? 0,
+            second: 0,
+            of: fireDay
+        ) ?? fireDay
     }
 }

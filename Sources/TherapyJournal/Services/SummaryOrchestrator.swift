@@ -75,12 +75,14 @@ final class SummaryOrchestrator: ObservableObject {
         isGenerating = false
     }
 
-    /// Manual trigger: generate and send summary now (uses tomorrow's session or a placeholder date).
+    /// Manual trigger: generate and send summary now (uses the next upcoming session within
+    /// the configured lead window, or a placeholder date if none).
     func generateNow() async {
         isGenerating = true
 
         do {
-            if let event = try await CalendarService.shared.checkForTomorrowSession() {
+            let leadDays = max(1, AppConfig.load().summaryLeadDays)
+            if let event = try await CalendarService.shared.findUpcomingSession(daysAhead: leadDays) {
                 await runSummaryPipeline(for: event)
             } else {
                 let placeholder = TherapyEvent(
@@ -130,7 +132,8 @@ final class SummaryOrchestrator: ObservableObject {
 
             let details = try await ClaudeConversationFetcher.shared.fetchConversationDetails(for: conversations)
             AppLogger.shared.info("Generating preview summary from \(details.count) conversations...")
-            let sessionDate = (try? await CalendarService.shared.checkForTomorrowSession())?.startDate ?? Date()
+            let leadDays = max(1, config.summaryLeadDays)
+            let sessionDate = (try? await CalendarService.shared.findUpcomingSession(daysAhead: leadDays))?.startDate ?? Date()
             let summary = try await SummaryGenerator.shared.generateSummary(
                 conversations: details,
                 sessionDate: sessionDate,

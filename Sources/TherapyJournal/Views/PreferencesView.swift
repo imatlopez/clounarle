@@ -58,6 +58,17 @@ struct PreferencesView: View {
                     .labelsHidden()
                     .frame(width: 70)
                 }
+                HStack {
+                    Text("Send")
+                    Picker("Lead days", selection: $config.summaryLeadDays) {
+                        ForEach(1...7, id: \.self) { d in
+                            Text("\(d)").tag(d)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 70)
+                    Text(config.summaryLeadDays == 1 ? "day before session" : "days before session")
+                }
             }
 
             Section("Claude Journal Project") {

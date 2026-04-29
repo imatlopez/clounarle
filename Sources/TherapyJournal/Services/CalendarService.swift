@@ -19,8 +19,9 @@ final class CalendarService {
         }
     }
 
-    /// Check if tomorrow has a therapy session matching the configured keyword.
-    func checkForTomorrowSession() async throws -> TherapyEvent? {
+    /// Find the earliest therapy session matching the configured keyword that starts within
+    /// `daysAhead` calendar days of today (inclusive of today and the day `daysAhead` from now).
+    func findUpcomingSession(daysAhead: Int) async throws -> TherapyEvent? {
         let config = AppConfig.load()
         guard !config.calendarKeyword.isEmpty else {
             AppLogger.shared.warn("Calendar keyword not configured")
@@ -39,29 +40,30 @@ final class CalendarService {
 
         let calendar = Calendar.current
         let now = Date()
-        guard let tomorrowStart = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)),
-              let tomorrowEnd = calendar.date(byAdding: .day, value: 1, to: tomorrowStart) else {
+        let searchStart = calendar.startOfDay(for: now)
+        guard let searchEnd = calendar.date(byAdding: .day, value: daysAhead + 1, to: searchStart) else {
             return nil
         }
 
-        let predicate = eventStore.predicateForEvents(withStart: tomorrowStart, end: tomorrowEnd, calendars: nil)
+        let predicate = eventStore.predicateForEvents(withStart: searchStart, end: searchEnd, calendars: nil)
         let events = eventStore.events(matching: predicate)
 
         let keyword = config.calendarKeyword.lowercased()
-        for event in events {
-            guard let title = event.title,
-                  title.lowercased().contains(keyword) else { continue }
+        let match = events
+            .filter { ($0.title ?? "").lowercased().contains(keyword) }
+            .min(by: { $0.startDate < $1.startDate })
 
-            AppLogger.shared.info("Found therapy session tomorrow: \(title) at \(event.startDate!)")
-            return TherapyEvent(
-                title: title,
-                startDate: event.startDate,
-                endDate: event.endDate,
-                calendarName: event.calendar.title
-            )
+        guard let event = match, let title = event.title else {
+            AppLogger.shared.info("No therapy session found within \(daysAhead) day(s)")
+            return nil
         }
 
-        AppLogger.shared.info("No therapy session found for tomorrow")
-        return nil
+        AppLogger.shared.info("Found therapy session \(title) at \(event.startDate!)")
+        return TherapyEvent(
+            title: title,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            calendarName: event.calendar.title
+        )
     }
 }

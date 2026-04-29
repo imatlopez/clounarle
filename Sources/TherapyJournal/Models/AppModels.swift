@@ -14,6 +14,7 @@ struct AppConfig: Codable {
     var launchAtLogin: Bool
     var lastSessionDate: Date?
     var alwaysRegenerate: Bool
+    var summaryLeadDays: Int
 
     // Cached values resolved at runtime — not user-editable
     var cachedOrgID: String
@@ -29,6 +30,7 @@ struct AppConfig: Codable {
         launchAtLogin: false,
         lastSessionDate: nil,
         alwaysRegenerate: false,
+        summaryLeadDays: 1,
         cachedOrgID: "",
         cachedProjectID: ""
     )
@@ -37,6 +39,7 @@ struct AppConfig: Codable {
         userEmail: String, therapistEmail: String, calendarKeyword: String,
         summarySendTime: DateComponents, claudeProjectURL: String, summaryLanguage: String,
         launchAtLogin: Bool, lastSessionDate: Date?, alwaysRegenerate: Bool,
+        summaryLeadDays: Int,
         cachedOrgID: String, cachedProjectID: String
     ) {
         self.userEmail = userEmail
@@ -48,6 +51,7 @@ struct AppConfig: Codable {
         self.launchAtLogin = launchAtLogin
         self.lastSessionDate = lastSessionDate
         self.alwaysRegenerate = alwaysRegenerate
+        self.summaryLeadDays = summaryLeadDays
         self.cachedOrgID = cachedOrgID
         self.cachedProjectID = cachedProjectID
     }
@@ -63,6 +67,7 @@ struct AppConfig: Codable {
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         lastSessionDate = try container.decodeIfPresent(Date.self, forKey: .lastSessionDate)
         alwaysRegenerate = try container.decodeIfPresent(Bool.self, forKey: .alwaysRegenerate) ?? false
+        summaryLeadDays = try container.decodeIfPresent(Int.self, forKey: .summaryLeadDays) ?? 1
         cachedOrgID = try container.decode(String.self, forKey: .cachedOrgID)
         cachedProjectID = try container.decode(String.self, forKey: .cachedProjectID)
     }
