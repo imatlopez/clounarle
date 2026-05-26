@@ -8,9 +8,10 @@ final class NightlyScheduler {
     private var timer: Timer?
     private var isRunning = false
 
-    /// In-memory guard so a transient pipeline failure doesn't get retried every minute.
-    /// Keyed by `event.startDate`; cleared on relaunch so a fresh attempt is possible.
-    private var attemptedEventDate: Date?
+    /// In-memory cooldown so a transient pipeline failure doesn't get retried every minute,
+    /// but does get retried after `retryCooldown` elapses. Cleared on relaunch.
+    private var lastAttempt: (eventDate: Date, at: Date)?
+    private let retryCooldown: TimeInterval = 30 * 60
 
     private init() {}
 
@@ -63,8 +64,9 @@ final class NightlyScheduler {
             return
         }
 
-        if let attempted = attemptedEventDate,
-           cal.isDate(attempted, inSameDayAs: event.startDate) {
+        if let lastAttempt,
+           cal.isDate(lastAttempt.eventDate, inSameDayAs: event.startDate),
+           Date().timeIntervalSince(lastAttempt.at) < retryCooldown {
             return
         }
 
@@ -72,7 +74,7 @@ final class NightlyScheduler {
         guard Date() >= fireTime else { return }
 
         AppLogger.shared.info("Scheduled fire-time reached for \(event.title) — running pipeline")
-        attemptedEventDate = event.startDate
+        lastAttempt = (event.startDate, Date())
         await SummaryOrchestrator.shared.runSummaryPipeline(for: event)
     }
 
