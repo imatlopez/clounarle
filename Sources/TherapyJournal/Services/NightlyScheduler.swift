@@ -13,6 +13,10 @@ final class NightlyScheduler {
     private var lastAttempt: (eventDate: Date, at: Date)?
     private let retryCooldown: TimeInterval = 30 * 60
 
+    /// True while a pipeline call is awaiting completion. Prevents concurrent runs when
+    /// the previous pipeline outlives the cooldown window (e.g. suspended across system sleep).
+    private var inFlight = false
+
     private init() {}
 
     /// Start the scheduler. Checks immediately (catch-up) and once per minute thereafter.
@@ -45,6 +49,8 @@ final class NightlyScheduler {
     /// fires whenever there's an upcoming therapy event whose scheduled fire-time has
     /// passed and which hasn't already been sent for.
     private func tickIfDue() async {
+        if inFlight { return }
+
         let config = AppConfig.load()
         let leadDays = max(1, config.summaryLeadDays)
 
@@ -75,7 +81,10 @@ final class NightlyScheduler {
 
         AppLogger.shared.info("Scheduled fire-time reached for \(event.title) — running pipeline")
         lastAttempt = (event.startDate, Date())
+        inFlight = true
         await SummaryOrchestrator.shared.runSummaryPipeline(for: event)
+        inFlight = false
+        lastAttempt = (event.startDate, Date())
     }
 
     /// Scheduled fire instant: `summaryLeadDays` days before the event's day, at the
