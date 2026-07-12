@@ -10,7 +10,11 @@ final class NightlyScheduler {
 
     /// In-memory cooldown so a transient pipeline failure doesn't get retried every minute,
     /// but does get retried after `retryCooldown` elapses. Cleared on relaunch.
-    private var lastAttempt: (eventDate: Date, at: Date)?
+    ///
+    /// A `.skipped` outcome (no journal entries yet) isn't a transient failure — retrying
+    /// every 30 minutes won't produce new content, it just re-fires the "report skipped"
+    /// notification. Those get a once-per-calendar-day cooldown instead.
+    private var lastAttempt: (eventDate: Date, at: Date, wasSkipped: Bool)?
     private let retryCooldown: TimeInterval = 30 * 60
 
     /// True while a pipeline call is awaiting completion. Prevents concurrent runs when
@@ -71,20 +75,29 @@ final class NightlyScheduler {
         }
 
         if let lastAttempt,
-           cal.isDate(lastAttempt.eventDate, inSameDayAs: event.startDate),
-           Date().timeIntervalSince(lastAttempt.at) < retryCooldown {
-            return
+           cal.isDate(lastAttempt.eventDate, inSameDayAs: event.startDate) {
+            if lastAttempt.wasSkipped {
+                if cal.isDate(lastAttempt.at, inSameDayAs: Date()) { return }
+            } else if Date().timeIntervalSince(lastAttempt.at) < retryCooldown {
+                return
+            }
         }
 
         let fireTime = scheduledFireTime(for: event, config: config)
         guard Date() >= fireTime else { return }
 
         AppLogger.shared.info("Scheduled fire-time reached for \(event.title) — running pipeline")
-        lastAttempt = (event.startDate, Date())
+        lastAttempt = (event.startDate, Date(), false)
         inFlight = true
         await SummaryOrchestrator.shared.runSummaryPipeline(for: event)
         inFlight = false
-        lastAttempt = (event.startDate, Date())
+        let wasSkipped: Bool
+        if case .skipped = SummaryOrchestrator.shared.lastStatus {
+            wasSkipped = true
+        } else {
+            wasSkipped = false
+        }
+        lastAttempt = (event.startDate, Date(), wasSkipped)
     }
 
     /// Scheduled fire instant: `summaryLeadDays` days before the event's day, at the
