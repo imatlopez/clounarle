@@ -132,21 +132,37 @@ final class SummaryGenerator {
 
         // Parse SSE stream — accumulate completion text deltas
         // Format: `event: completion\ndata: {"type":"completion","completion":"...","stop_reason":null|"end_turn"}`
+        //
+        // TEMPORARY: logging every raw line + decode outcome to diagnose a report that
+        // came back as just "Listo." instead of the expected multi-section summary.
+        // Remove once root cause is confirmed.
         var accumulated = ""
+        var decodedEventCount = 0
+        var undecodedLineCount = 0
         for try await line in bytes.lines {
             guard line.hasPrefix("data: ") else { continue }
             let payload = String(line.dropFirst(6))
             guard let data = payload.data(using: .utf8) else { continue }
 
             if let event = try? JSONDecoder().decode(SSECompletionEvent.self, from: data) {
+                decodedEventCount += 1
+                AppLogger.shared.debug("SSE decoded event #\(decodedEventCount): stop_reason=\(event.stopReason ?? "nil") completion=\(String(describing: event.completion))")
                 if let text = event.completion {
                     accumulated += text
                 }
-                if event.stopReason == "end_turn" {
+                // Observed stop_reason values from claude.ai are "stop_sequence" (normal
+                // completion) — "end_turn" has never been seen. Break on any non-nil
+                // stop_reason rather than one specific value, so the loop doesn't depend
+                // on the connection closing itself to terminate.
+                if event.stopReason != nil {
                     break
                 }
+            } else {
+                undecodedLineCount += 1
+                AppLogger.shared.debug("SSE line failed to decode as SSECompletionEvent: \(payload)")
             }
         }
+        AppLogger.shared.debug("SSE stream done: \(decodedEventCount) decoded events, \(undecodedLineCount) undecoded lines, accumulated \(accumulated.count) chars")
 
         guard !accumulated.isEmpty else {
             throw SummaryError.noContentInResponse

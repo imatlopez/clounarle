@@ -13,6 +13,11 @@ struct AppConfig: Codable {
     var summaryLanguage: String
     var launchAtLogin: Bool
     var lastSessionDate: Date?
+    /// When journal content was last actually captured in a sent report. Used as the
+    /// period-start boundary for the next summary. Distinct from `lastSessionDate`
+    /// (the calendar date of the session that report was prepared for, which is a
+    /// future date at send time and so can't be used as a "since" boundary).
+    var lastSummarySentAt: Date?
     var alwaysRegenerate: Bool
     var summaryLeadDays: Int
 
@@ -29,6 +34,7 @@ struct AppConfig: Codable {
         summaryLanguage: "English",
         launchAtLogin: false,
         lastSessionDate: nil,
+        lastSummarySentAt: nil,
         alwaysRegenerate: false,
         summaryLeadDays: 1,
         cachedOrgID: "",
@@ -38,7 +44,7 @@ struct AppConfig: Codable {
     init(
         userEmail: String, therapistEmail: String, calendarKeyword: String,
         summarySendTime: DateComponents, claudeProjectURL: String, summaryLanguage: String,
-        launchAtLogin: Bool, lastSessionDate: Date?, alwaysRegenerate: Bool,
+        launchAtLogin: Bool, lastSessionDate: Date?, lastSummarySentAt: Date? = nil, alwaysRegenerate: Bool,
         summaryLeadDays: Int,
         cachedOrgID: String, cachedProjectID: String
     ) {
@@ -50,6 +56,7 @@ struct AppConfig: Codable {
         self.summaryLanguage = summaryLanguage
         self.launchAtLogin = launchAtLogin
         self.lastSessionDate = lastSessionDate
+        self.lastSummarySentAt = lastSummarySentAt
         self.alwaysRegenerate = alwaysRegenerate
         self.summaryLeadDays = summaryLeadDays
         self.cachedOrgID = cachedOrgID
@@ -66,6 +73,7 @@ struct AppConfig: Codable {
         summaryLanguage = try container.decode(String.self, forKey: .summaryLanguage)
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         lastSessionDate = try container.decodeIfPresent(Date.self, forKey: .lastSessionDate)
+        lastSummarySentAt = try container.decodeIfPresent(Date.self, forKey: .lastSummarySentAt)
         alwaysRegenerate = try container.decodeIfPresent(Bool.self, forKey: .alwaysRegenerate) ?? false
         summaryLeadDays = try container.decodeIfPresent(Int.self, forKey: .summaryLeadDays) ?? 1
         cachedOrgID = try container.decode(String.self, forKey: .cachedOrgID)

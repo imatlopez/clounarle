@@ -60,8 +60,10 @@ final class SummaryOrchestrator: ObservableObject {
             AppLogger.shared.info("Sending summary email...")
             try await EmailService.shared.sendSummaryEmail(summary: summary)
 
-            // Success — persist session date so next run covers from here
+            // Success — persist session date (duplicate-send guard) and send time
+            // (period-start boundary for the next summary)
             saveLastSessionDate(event.startDate)
+            saveLastSummarySentAt(Date())
             updateStatus(.sent(date: Date()))
             NotificationManager.shared.notifySummarySent(sessionDate: event.startDate)
             AppLogger.shared.info("Summary pipeline completed successfully")
@@ -154,11 +156,11 @@ final class SummaryOrchestrator: ObservableObject {
 
     // MARK: - Time Window
 
-    /// Returns (periodStart, periodEnd) — start is lastSessionDate if saved, else 7-day fallback.
+    /// Returns (periodStart, periodEnd) — start is lastSummarySentAt if saved, else 7-day fallback.
     private func fetchPeriod() -> (Date, Date) {
         let periodEnd = Date()
         let config = AppConfig.load()
-        let periodStart = config.lastSessionDate
+        let periodStart = config.lastSummarySentAt
             ?? Calendar.current.date(byAdding: .day, value: -7, to: periodEnd)!
         return (periodStart, periodEnd)
     }
@@ -168,6 +170,13 @@ final class SummaryOrchestrator: ObservableObject {
         config.lastSessionDate = date
         try? config.save()
         AppLogger.shared.info("Saved lastSessionDate: \(date)")
+    }
+
+    private func saveLastSummarySentAt(_ date: Date) {
+        var config = AppConfig.load()
+        config.lastSummarySentAt = date
+        try? config.save()
+        AppLogger.shared.info("Saved lastSummarySentAt: \(date)")
     }
 
     // MARK: - Status Persistence
